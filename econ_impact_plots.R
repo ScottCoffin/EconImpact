@@ -5,6 +5,8 @@ library(GmAMisc) #alt Jenks
 library(cowplot) #plotting multiple graphs
 library(rstatix) #pipe-friendly R fnx for stats
 library(ggpubr) #easy plots
+library(grid) #to make grobs
+library(gridExtra) # to make multiple plots
 
 #### Load in Data ####
 econ3 <- read.csv("CWS.csv", header =T, na.strings = "")
@@ -36,7 +38,7 @@ econ3 %>%
 breaks <- getJenksBreaks(econ3$Service.Connections, 5)
 
 #alternative method with stats, very slow
-plotJenks(econ3$Service.Connections, n=4) 
+#plotJenks(econ3$Service.Connections, n=4) 
 
 ##### Breaks from Bethany ####
 # SCs from 0 to 1009: 2,398 systems
@@ -187,3 +189,75 @@ plot_grid(BinA, BinB, BinC, BinD,combined,
           ncol =2,
           nrow= 3)
 
+
+#### Plot with ;linear x-scale and manual bins ####
+
+#combined
+combined <- ggplot(data = econ3, mapping = aes(x=Service.Connections,
+                                               color = tag,
+                                               fill = tag)) + 
+  geom_histogram(aes(y=..density..),alpha=0.7) + 
+  geom_density(alpha =0.2) +
+  geom_rug() +
+  labs(x='Service Connections',
+       y = "Density",
+       title = "Water Systems Binned by Jenks Natural Breaks",
+       caption = "Data from SDWIS")
+theme_minimal()
+
+# Bin A
+BinA <- filter(econ3, tag =="Bin A") %>% 
+  ggplot(mapping = aes(x=Service.Connections)) + 
+  geom_histogram(binwidth = 10,alpha=0.7,color = "red", fill = "red") + 
+  geom_density(alpha = 0.2, color = "black") +
+  geom_rug() +
+  labs(x='Service Connections',
+       y = "Density",
+       title = "Bin A",
+       subtitle = "n = 1971")
+
+#medium plot
+BinB <-filter(econ3, tag =="Bin B") %>% 
+  ggplot(mapping = aes(x=Service.Connections)) + 
+  geom_histogram(binwidth =60,alpha=0.7, color = "seagreen4", fill = "seagreen4") + 
+  geom_density(alpha = 0.2, color = "black") +
+  geom_rug() +
+  labs(x='Service Connections',
+       y = "Density",
+       title = "Bin B",
+       subtitle = "n = 265")
+
+#large plot
+BinC <- filter(econ3, tag =="Bin C") %>% 
+  ggplot(mapping = aes(x=Service.Connections))+
+  geom_histogram(binwidth = 100,alpha=0.7, color = "blue", fill = "blue") + 
+  geom_density(alpha = 0.2, color = "black") +
+  geom_rug() +
+  labs(x='Service Connections',
+       y = "Density",
+       title = "Bin C",
+       subtitle = "n = 107")
+
+#very large plot
+BinD <- filter(econ3, tag =="Bin D") %>% 
+  ggplot(mapping = aes(Service.Connections))+
+  geom_histogram(binwidth = 120,alpha=0.7, color = "purple", fill = "purple") + 
+  geom_density(alpha = 0.2, color = "black") +
+  geom_rug() +
+  labs(x='Service Connections',
+       y = "Density",
+       title = "Bin D",
+       subtitle = "n = 73",
+       caption = "Data from SDWIS")
+
+#Plot all together
+
+grid.arrange(BinA, BinB, BinC, BinD,combined,
+             ncol =2,nrow= 3,
+             top = textGrob("Linear Histograms", gp=gpar(fontsize = 30, font=4)))
+
+ggsave(
+  "linearplot.png",
+  width = 5,
+  scale = 2,
+    dpi = 500)
