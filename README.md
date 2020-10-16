@@ -14,6 +14,8 @@ Write final list of water systems to call
 
 ## Resources
 https://bookdown.org/jespasareig/Book_How_to_weight_a_survey/
+https://www.datacamp.com/courses/analyzing-survey-data-in-r
+https://cran.r-project.org/web/packages/survey/survey.pdf
 
 ## Meeting Notes 
 Develop Representative Survey for Economic Impacts from COVID-19
