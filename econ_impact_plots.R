@@ -7,8 +7,7 @@ library(rstatix) #pipe-friendly R fnx for stats
 library(ggpubr) #easy plots
 
 #### Load in Data ####
-setwd("C:/Users/SCoffin/Documents/OFFLINE/DATA/R/Economic Impact Survey")
-econ3 <- read.csv("~/OFFLINE/DATA/R/Economic Impact Survey/CWS.csv", header =T, na.strings = "")
+econ3 <- read.csv("CWS.csv", header =T, na.strings = "")
 
 
 #### Filter Data ####
