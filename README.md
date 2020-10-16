@@ -13,6 +13,18 @@ Determine what other fee codes mean
 Write final list of water systems to call
 
 ## Resources
+
+### Specific to Economic Impact of Water Systems in the US and CA
+https://www.capradio.org/articles/2020/10/15/just-how-bad-is-californias-water-debt-problem-the-state-isnt-sure/
+
+https://www.awwa.org/Portals/0/AWWA/Communications/AWWA-AMWA-COVID-Report_2020-04.pdf
+
+https://www.ppic.org/blog/recession-safety-net-needed-for-states-small-water-systems/
+
+https://efc.sog.unc.edu/sites/default/files/2020/North%20Carolina%20Utilities%20and%20COVID-19.pdf
+
+### Survey Design Resources 
+
 https://bookdown.org/jespasareig/Book_How_to_weight_a_survey/
 
 https://www.datacamp.com/courses/analyzing-survey-data-in-r
