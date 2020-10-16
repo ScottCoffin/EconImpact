@@ -1,4 +1,6 @@
 # EconImpact
+Purpose: Determine economic impacts to public water systems from COVID 19
+
 ## To-Do List
 Determine margins of error for different sampling scenarios
 
