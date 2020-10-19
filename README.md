@@ -32,6 +32,9 @@ https://www.datacamp.com/courses/analyzing-survey-data-in-r
 https://cran.r-project.org/web/packages/survey/survey.pdf
 
 ## Meeting Notes 
+
+LIVE LINK: https://cawaterboards-my.sharepoint.com/:w:/r/personal/sean_mccarthy_waterboards_ca_gov/_layouts/15/guestaccess.aspx?e=94uC4x&share=EXOjEVKXjWpCs0llHaH6PWUBIhF3aVISXzVFP7THr0jzaA
+
 Develop Representative Survey for Economic Impacts from COVID-19
 1. Assess financial viability and potential impacts of water delivery to customers: staff will complete preliminary phone survey with water systems.
 
