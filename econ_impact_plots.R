@@ -256,8 +256,59 @@ grid.arrange(BinA, BinB, BinC, BinD,combined,
              ncol =2,nrow= 3,
              top = textGrob("Linear Histograms", gp=gpar(fontsize = 30, font=4)))
 
-ggsave(
-  "linearplot.png",
+ggsave(path = "plots",
+  filename = "linearplot.png",
   width = 5,
   scale = 2,
     dpi = 500)
+
+#### Analysis of Bias ####
+
+#summarize in table
+biasSumm <- econ3 %>% 
+  group_by(Fee.Code, tag) %>% 
+  summarize(count_by_feecodeTag = n(),
+            mean_serv.conn. = mean(Service.Connections, na.rm = TRUE),
+            med_serv.conn = median(Service.Connections, na.rm = TRUE),
+            sd_serv.conn. = sd(Service.Connections, na.rm = TRUE))
+
+# plot percentage stacked
+percentstacked <- ggplot(data = biasSumm, aes(fill = Fee.Code, x= tag, y = count_by_feecodeTag)) + 
+  geom_bar(position = "fill", stat = "identity") +
+  labs(x='Bin',
+       y = "Proportion of PWS'in Each bin",
+       title = "Water Systems Binned by Jenks Natural Breaks",
+       subtitle = "Stacked Percentage Chart",
+       caption = "Data from SDWIS")
+
+# plot percentage stacked
+stacked <- ggplot(data = biasSumm, aes(fill = Fee.Code, x= tag, y = count_by_feecodeTag)) + 
+  geom_bar(position = "stack", stat = "identity") +
+  labs(x='Bin',
+       y = "PWS'in Each bin",
+       title = "Water Systems Binned by Jenks Natural Breaks",
+       subtitle = "Stacked Percentage Chart",
+       caption = "Data from SDWIS")
+
+# plot grouped
+grouped <- ggplot(data = biasSumm, aes(fill = Fee.Code, x= tag, y = count_by_feecodeTag)) + 
+  geom_bar(position = "dodge", stat = "identity") +
+  labs(x='Bin',
+       y = "PWS'in Each bin",
+       title = "Water Systems Binned by Jenks Natural Breaks",
+       subtitle = "Group Bar Chart",
+       caption = "Data from SDWIS")
+
+
+#all together
+BinFeeCode<- grid.arrange(percentstacked, grouped,
+             ncol =2,nrow= 1,
+             top = textGrob("Water Systems Bins By Fee Code", gp=gpar(fontsize = 30, font=4)))
+
+#Save
+ggsave(path = "plots",
+  filename = "WaterSystemsGroupedByFeeCodes.png",
+  BinFeeCode,
+  width = 10,
+  scale = 2,
+  dpi = 500)
