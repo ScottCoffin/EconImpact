@@ -9,7 +9,7 @@ library(grid) #to make grobs
 library(gridExtra) # to make multiple plots
 
 #### Load in Data ####
-econ3 <- read.csv("CWS.csv", header =T, na.strings = "")
+econ1 <- read.csv("CWS.csv", header =T, na.strings = "")
 
 
 #### Filter Data ####
@@ -19,14 +19,18 @@ econ3 <- read.csv("CWS.csv", header =T, na.strings = "")
 #don't need to filter because Bethany already did
 
 #Count each fee code category
-econ3 %>% 
+econ1 %>% 
   group_by(Fee.Code) %>% 
   summarize(n())
 
 ## filter data ##
-econ3<- econ3 %>% 
+econ3 <- econ1 %>% 
  filter(Service.Connections <10000) %>% #filter above 2 because there are many
-  filter(Fee.Code !="WH")  #filter out wholesalers 
+  filter(Fee.Code !="WH") %>%  #filter out wholesalers 
+  filter(Fee.Code !="N1") %>% #transient non-community water systems
+  filter(Fee.Code !="N2") %>%  #transient non-community water systems (handwash exemption)
+  filter(Fee.Code != "SP") #nonTransient-NonCommunity water system
+  
 
 #re-count groups
 econ3 %>% 
@@ -65,20 +69,28 @@ breaks
 #Store group as new column
 econ3 <-as_tibble(econ3) %>% 
   mutate(tag = case_when(
-    Service.Connections >= 1 & Service.Connections < 1045 ~tags[1],
-    Service.Connections >= 1045 & Service.Connections < 3339 ~tags[2],
-    Service.Connections >= 3339 & Service.Connections <= 6360 ~tags[3],
-    Service.Connections >= 6360 & Service.Connections <= 9944 ~tags[4],
-  ))
+    Service.Connections >= breaks[1] & Service.Connections < breaks[2] ~tags[1],
+    Service.Connections >= breaks[2] & Service.Connections < breaks[3] ~tags[2],
+    Service.Connections >= breaks[3] & Service.Connections <= breaks[4] ~tags[3],
+    Service.Connections >= breaks[4] & Service.Connections <= breaks[5] ~tags[4],
+  )) %>% 
+  mutate(logService.Connections = log10(Service.Connections))
 
 #tag is character vector, so convert to factor
 econ3$tag <- factor(econ3$tag,
                     levels = tags,
                     ordered = FALSE)
 
-
+#save data table as csv
+write.csv(econ3, "econ3.csv")
 
 #### Normality Check ####
+#Shapiro test for normality
+econ3 %>% 
+  group_by(tag) %>% 
+  shapiro_test(logService.Connections)
+
+
 # Density plot
 econA <- econ3 %>% 
   filter(tag == "Bin A")
@@ -96,21 +108,21 @@ econD <- econ3 %>%
 ggdensity(econA$Service.Connections, fill = "red")
 qplotA <- ggqqplot(econA$Service.Connections, fill = "red") +
   labs(title = "Bin A",
-       subtitle = "n = 1971, p = 4.87e-52")
+       subtitle = "n = 1944, p = 6.76e-17")
 
 #MEDIUM
 ggdensity(econB$Service.Connections, fill = "red")
 qplotB<- ggqqplot(econB$Service.Connections, fill = "seagreen4") +
   labs(title = "Bin B",
-       subtitle = "n = 265, p = 6.82e-9")
+       subtitle = "n = 265, p = 3.16e-7")
 #Large
 qplotC<- ggqqplot(econC$Service.Connections, fill = "blue") +
   labs(title = "Bin C",
-       subtitle = "n = 107, p = 1.70e-4")
+       subtitle = "n = 107, p = 5.68e-4")
 #verylarge
 qplotD<- ggqqplot(econD$Service.Connections, fill = "yellow") +
   labs(title = "Bin D",
-       subtitle = "n = 73, p =1.03e-3")
+       subtitle = "n = 73, p =1.34e-3")
 
 #### Combine qplots ####
 plot_grid(qplotA, qplotB, qplotC, qplotD,
@@ -118,10 +130,6 @@ plot_grid(qplotA, qplotB, qplotC, qplotD,
           nrow= 3)
 
 
-#Shapiro test for normality
-econ3 %>% 
-  group_by(tag) %>% 
-  shapiro_test(Service.Connections)
 
 ### Data Visualization ####
 #Plot as histograms
@@ -140,54 +148,69 @@ theme_minimal()
 ##plot each group individually ##
 #Small Plot
 BinA <- filter(econ3, tag =="Bin A") %>% 
-  ggplot(mapping = aes(x=log10(Service.Connections))) + 
-  geom_histogram(aes(y=..density..),alpha=0.7,color = "red", fill = "red") + 
-  geom_density(alpha = 0.2, color = "black") +
+  ggplot(mapping = aes(x=log10(Service.Connections),
+                       color = Fee.Code,
+                       fill = Fee.Code)) + 
+  geom_histogram(alpha=0.7) + #color = "red", fill = "red"  
+  geom_density(alpha = 0.2, color = "black", position = "stack") +
   geom_rug() +
   labs(x='LOG10 Service Connections',
-       y = "Density",
+       y = "Frequency",
        title = "Bin A",
-       subtitle = "n = 1971")
+       subtitle = "n = 1944")
 
 #medium plot
 BinB <- filter(econ3, tag =="Bin B") %>% 
-  ggplot(mapping = aes(x=log10(Service.Connections))) + 
-  geom_histogram(aes(y=..density..),alpha=0.7, color = "seagreen4", fill = "seagreen4") + 
+  ggplot(mapping = aes(x=log10(Service.Connections),
+                       color = Fee.Code,
+                       fill = Fee.Code)) + 
+  geom_histogram(alpha=0.7) + # color = "seagreen4", fill = "seagreen4") + 
   geom_density(alpha = 0.2, color = "black") +
   geom_rug() +
   labs(x='LOG10 Service Connections',
-       y = "Density",
+       y = "Frequency",
        title = "Bin B",
        subtitle = "n = 265")
 
-#large plot
+#Bin C plot
 BinC <- filter(econ3, tag =="Bin C") %>% 
-  ggplot(mapping = aes(x=log10(Service.Connections)))+
-  geom_histogram(aes(y=..density..),alpha=0.7, color = "blue", fill = "blue") + 
+  ggplot(mapping = aes(x=log10(Service.Connections),
+                       color = Fee.Code,
+                       fill = Fee.Code))+
+  geom_histogram(alpha=0.7) +  #,color = "blue", fill = "blue") + 
   geom_density(alpha = 0.2, color = "black") +
   geom_rug() +
   labs(x='LOG10 Service Connections',
-       y = "Density",
+       y = "Frequency",
        title = "Bin C",
        subtitle = "n = 107")
 
 #very large plot
 BinD <- filter(econ3, tag =="Bin D") %>% 
-  ggplot(mapping = aes(x=log10(Service.Connections)))+
-  geom_histogram(aes(y=..density..),alpha=0.7, color = "purple", fill = "purple") + 
+  ggplot(mapping = aes(x=log10(Service.Connections),
+                       color = Fee.Code,
+                       fill = Fee.Code))+
+  geom_histogram(alpha=0.7) + #, color = "purple", fill = "purple") + 
   geom_density(alpha = 0.2, color = "black") +
   geom_rug() +
   labs(x='LOG10 Service Connections',
-       y = "Density",
+       y = "Frequency",
        title = "Bin D",
        subtitle = "n = 73",
        caption = "Data from SDWIS")
 
 #Plot all together
 
-plot_grid(BinA, BinB, BinC, BinD,combined,
+logplots<- plot_grid(BinA, BinB, BinC, BinD,combined,
           ncol =2,
           nrow= 3)
+
+ggsave(path = "plots",
+       filename = "logplot.png",
+       logplots,
+       width = 5,
+       scale = 2,
+       dpi = 500)
 
 
 #### Plot with ;linear x-scale and manual bins ####
@@ -207,8 +230,8 @@ theme_minimal()
 
 # Bin A
 BinA <- filter(econ3, tag =="Bin A") %>% 
-  ggplot(mapping = aes(x=Service.Connections)) + 
-  geom_histogram(binwidth = 10,alpha=0.7,color = "red", fill = "red") + 
+  ggplot(mapping = aes(x=Service.Connections, color = Fee.Code, fill = Fee.Code)) + 
+  geom_histogram(binwidth = 10,alpha=0.7) + 
   geom_density(alpha = 0.2, color = "black") +
   geom_rug() +
   labs(x='Service Connections',
@@ -252,12 +275,13 @@ BinD <- filter(econ3, tag =="Bin D") %>%
 
 #Plot all together
 
-grid.arrange(BinA, BinB, BinC, BinD,combined,
+linearplots<- grid.arrange(BinA, BinB, BinC, BinD,combined,
              ncol =2,nrow= 3,
              top = textGrob("Linear Histograms", gp=gpar(fontsize = 30, font=4)))
 
 ggsave(path = "plots",
   filename = "linearplot.png",
+  linearplots,
   width = 5,
   scale = 2,
     dpi = 500)
@@ -279,7 +303,7 @@ percentstacked <- ggplot(data = biasSumm, aes(fill = Fee.Code, x= tag, y = count
        y = "Proportion of PWS'in Each bin",
        title = "Water Systems Binned by Jenks Natural Breaks",
        subtitle = "Stacked Percentage Chart",
-       caption = "Data from SDWIS")
+       caption = "Breaks: 1, 1045,3339, 6360, 9944")
 
 # plot percentage stacked
 stacked <- ggplot(data = biasSumm, aes(fill = Fee.Code, x= tag, y = count_by_feecodeTag)) + 
@@ -288,7 +312,7 @@ stacked <- ggplot(data = biasSumm, aes(fill = Fee.Code, x= tag, y = count_by_fee
        y = "PWS'in Each bin",
        title = "Water Systems Binned by Jenks Natural Breaks",
        subtitle = "Stacked Percentage Chart",
-       caption = "Data from SDWIS")
+       caption = "Breaks: 1, 1045,3339, 6360, 9944")
 
 # plot grouped
 grouped <- ggplot(data = biasSumm, aes(fill = Fee.Code, x= tag, y = count_by_feecodeTag)) + 
@@ -297,7 +321,7 @@ grouped <- ggplot(data = biasSumm, aes(fill = Fee.Code, x= tag, y = count_by_fee
        y = "PWS'in Each bin",
        title = "Water Systems Binned by Jenks Natural Breaks",
        subtitle = "Group Bar Chart",
-       caption = "Data from SDWIS")
+       caption = "Breaks: 1, 1045,3339, 6360, 9944")
 
 
 #all together
@@ -312,3 +336,109 @@ ggsave(path = "plots",
   width = 10,
   scale = 2,
   dpi = 500)
+
+
+#### Interesting Plots ####
+filter(econ3, tag =="Bin A") %>% 
+  ggplot(mapping = aes(x=log10(Service.Connections), fill = Fee.Code)) + 
+  geom_histogram(aes(y=..density..),alpha=0.7)+
+  geom_density(alpha=0.4)
+
+
+filter(econ3, Fee.Code =="DAVCS") %>% 
+  ggplot(mapping = aes(x=log10(Service.Connections))) + 
+  geom_histogram(aes(y=..density..),alpha=0.7)+
+  geom_density(alpha = 0.4) +
+  labs(x='LOG10 Service Connections',
+       y = "Density",
+       title = "Small Community Water Systems (Fee Code = SC)",
+       subtitle = "n = 1700")
+
+#plot by fee code
+DAVCL<- filter(econ3, Fee.Code =="DAVCL") %>% 
+  ggplot(mapping = aes(x=log10(Service.Connections), fill = tag)) + 
+  geom_histogram(aes(y=..density..),alpha=0.7)+
+  geom_density(alpha = 0.4) +
+  labs(x='LOG10 Service Connections',
+       y = "Density",
+       title = "Disadvantaged Large Community Water Systems (Fee Code = DAVCL)",
+       subtitle = "n = 124")
+
+DAVCS<- filter(econ3, Fee.Code =="DAVCS") %>% 
+  ggplot(mapping = aes(x=log10(Service.Connections))) + 
+  geom_histogram(aes(y=..density..),alpha=0.7, fill = tag)+
+  geom_density(alpha = 0.4) +
+  labs(x='LOG10 Service Connections',
+       y = "Density",
+       title = "Disadvantaged Community Water Systems (Fee Code = DAVCS)",
+       subtitle = "n = 238")
+
+C1<- filter(econ3, Fee.Code =="C1") %>% 
+  ggplot(mapping = aes(x=log10(Service.Connections), fill = tag)) + 
+  geom_histogram(aes(y=..density..),alpha=0.7)+
+  geom_density(alpha = 0.4) +
+  labs(x='LOG10 Service Connections',
+       y = "Density",
+       title = "Large Community Water Systems (Fee Code = C1)",
+       subtitle = "n = 327")
+
+SC<- filter(econ3, Fee.Code =="SC") %>% 
+  ggplot(mapping = aes(x=log10(Service.Connections), fill = tag)) + 
+  geom_histogram(aes(y=..density..),alpha=0.7)+
+  geom_density(alpha = 0.4) +
+  labs(x='LOG10 Service Connections',
+       y = "Density",
+       title = "Small Community Water Systems (Fee Code = SC)",
+       subtitle = "n = 1700")
+
+#all together
+FeeCodeBin<- grid.arrange(DAVCL, DAVCS, C1, SC,
+                          ncol =2,nrow= 2,
+                          top = textGrob("Water Systems Fee Codes By Bin", gp=gpar(fontsize = 30, font=4)))
+
+#Save
+ggsave(path = "plots",
+       filename = "FeeCodeGroupedByBins.png",
+       FeeCodeBin,
+       width = 10,
+       scale = 2,
+       dpi = 500)
+
+tagbycode<- econ3 %>% 
+  ggplot(mapping = aes(x=log10(Service.Connections), fill = tag)) + 
+  geom_histogram(aes(y=..density..),alpha=0.7)+
+  facet_grid(~Fee.Code) +
+  labs(x='LOG10 Service Connections',
+       y = "Density",
+       title = "Fee Codes by Bins")+
+  theme_bw()
+
+
+## Kernel density by bin
+
+econ3 %>% 
+  ggplot(mapping = aes(x=log10(Service.Connections))) + 
+  geom_density(aes(fill = Fee.Code),alpha=0.3)+
+  geom_histogram(aes(y=..density..,fill = tag, alpha = 0.7))+
+  labs(x='LOG10 Service Connections',
+       y = "Density",
+       title = "Fee Codes by Bins")
+
+# 2D
+ggplot(data = econ3, aes(x= Service.Connections, y = tag, color = Fee.Code, size = Population)) + 
+  geom_point(alpha = 0.7)
+
+  #population vs service connection
+scatter1 <- ggplot(data = econ3, aes(x= Population, y = Service.Connections, color = Fee.Code)) + 
+  geom_point(alpha = 0.6) +
+  geom_smooth()+
+  labs(x='Population',
+       y = "Service Connections",
+       title = "Water Systems By Population and Service Connection")
+
+ggsave(path = "plots",
+              filename = "scatter1.png",
+              scatter1,
+              width = 10,
+              scale = 2,
+              dpi = 500)
