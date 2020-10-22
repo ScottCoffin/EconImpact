@@ -3,7 +3,7 @@ library(tidyverse)
 library(survey)
 
 ##### Read in data ####
-econ <- read.csv("econ3.csv", header =T, na.strings = "")
+econ <- read.csv("Datasets/econ3.csv", header =T, na.strings = "")
 
 #make column for total # water systems (finite population count)
 #FPC = ((N - n)/(N - 1)) ^ 0.5

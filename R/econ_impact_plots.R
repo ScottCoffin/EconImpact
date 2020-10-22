@@ -9,7 +9,7 @@ library(grid) #to make grobs
 library(gridExtra) # to make multiple plots
 
 #### Load in Data ####
-econ1 <- read.csv("CWS.csv", header =T, na.strings = "")
+econ1 <- read.csv("Datasets/CWS.csv", header =T, na.strings = "")
 
 
 #### Filter Data ####
