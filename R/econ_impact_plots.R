@@ -82,7 +82,7 @@ econ3$tag <- factor(econ3$tag,
                     ordered = FALSE)
 
 #save data table as csv
-write.csv(econ3, "econ3.csv")
+write.csv(econ3, "Datasets/econ3.csv")
 
 #### Normality Check ####
 #Shapiro test for normality
@@ -423,6 +423,31 @@ econ3 %>%
   labs(x='LOG10 Service Connections',
        y = "Density",
        title = "Fee Codes by Bins")
+
+#make data table from breaks
+breaksdf <-tibble(log10(breaks))
+
+#map fee code distributions showing Jenk's breaks
+FeeCodeDistributions <- econ3 %>% 
+  ggplot(mapping = aes(x=log10(Service.Connections))) + 
+  geom_histogram(aes(fill = Fee.Code), position = "identity",alpha=0.6, bins = 40) +
+  #geom_density(aes(fill = Fee.Code),alpha=0.6)+
+  labs(x='LOG10 Service Connections',
+       y = "Count",
+       title = "Fee Code Distributions",
+       subtitle = "Jenk's Breaks shown in dotted lines")+
+  scale_fill_discrete(name = "Fee Code", labels = c("Large Water System", "Disadvantaged Large Community Water System", "Disadvantaged Small Community Water System", "Small Community"))+
+  geom_vline(data = breaksdf, mapping = aes(xintercept= log10(breaks)), linetype = 'dashed') +
+  theme_half_open()
+
+
+
+ggsave(path = "plots",
+       filename = "Fee Code Distributions.png",
+       FeeCodeDistributions,
+       width = 10,
+       scale = 2,
+       dpi = 500)
 
 # 2D
 ggplot(data = econ3, aes(x= Service.Connections, y = tag, color = Fee.Code, size = Population)) + 
