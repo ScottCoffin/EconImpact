@@ -37,9 +37,14 @@ econ3 %>%
   group_by(Fee.Code) %>% 
   summarize(n())
 
+#determine mean and stdev
+econ3 %>% 
+  summarize(mean = mean(Service.Connections),
+            var = var(Service.Connections))
+
 #### Natural Breaks ####
 #Determine natural breaks and assign
-breaks <- getJenksBreaks(econ3$Service.Connections, 5)
+breaks <- getJenksBreaks(econ3$Service.Connections, 6)
 
 #alternative method with stats, very slow
 #plotJenks(econ3$Service.Connections, n=4) 
