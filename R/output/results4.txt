@@ -1,0 +1,24 @@
+
+---------------------------------------------
+Optimal stratification with Genetic Algorithm
+---------------------------------------------
+ *** Parameters ***
+---------------------------
+Domain:  4
+Maximum number of strata:  17
+Minimum number of units per stratum:  2
+Take-all strata (TRUE/FALSE):  FALSE
+number of sampling strata :  17
+Number of target variables:  3
+Number of domains:  1
+Number of GA iterations:  400
+Dimension of GA population:  20
+Mutation chance in GA generation:  0.005
+Elitism rate in GA generation:  0.2
+Chance to add strata to maximum:  0
+Allocation with real numbers instead of integers:  TRUE
+ *** Sample cost:  185.2775
+ *** Number of strata:  6
+ *** Sample cost:  185.2775
+ *** Number of strata:  6
+...written output to C:/Users/SCoffin/Documents/OFFLINE/DATA/R/EconImpact/R/output/outstrata4.txt

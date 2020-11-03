@@ -1,5 +1,6 @@
 library(tidyverse) 
-dem <- read.csv("Datasets/urws_tracts_intersect_joined.csv", header =T, na.strings = c("", "#N/A", "NA"))
+library(readxl)
+dem <- read_excel("Datasets/pop_weighted_characteristics.xlsx", na = c("", "#N/A", "NA"))
 dem2 <- na.omit(dem) #omit all rows with NAs
 
 #Count Fee Codes

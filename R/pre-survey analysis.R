@@ -10,6 +10,12 @@ bin4 <- read.csv("Datasets/Bin4_sample.csv", header = T, na.strings = "")
 #combine data to single df
 df <- rbind(bin1, bin2, bin3, bin4)
 
+#examine proportions
+SummaryRealSampleList <- df %>% 
+  group_by(tag) %>% 
+  summarize(minServConns = min(SC), maxServConns = max(SC), count = n())
+SummaryRealSampleList
+
 #make subsets of data from population set
 tag1<- econ3 %>% 
   filter(tag == "Bin A") 
