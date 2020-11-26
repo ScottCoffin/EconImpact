@@ -2,6 +2,7 @@
 library(tidyverse) 
 library(survey)
 
+## Real Sample List Created by Bethany
 #split data
 bin1 <- read.csv("Datasets/Bin1_sample.csv", header = T, na.strings = "")
 bin2 <- read.csv("Datasets/Bin2_sample.csv", header = T, na.strings = "")
@@ -9,12 +10,44 @@ bin3 <- read.csv("Datasets/Bin3_sample.csv", header = T, na.strings = "")
 bin4 <- read.csv("Datasets/Bin4_sample.csv", header = T, na.strings = "")
 #combine data to single df
 df <- rbind(bin1, bin2, bin3, bin4)
+write.csv(df, file = "Datasets/surveyList.csv")
+
+## List of original water systems considered for survey
+econ3 <- read.csv("Datasets/econ3.csv")
 
 #examine proportions
 SummaryRealSampleList <- df %>% 
   group_by(tag) %>% 
-  summarize(minServConns = min(SC), maxServConns = max(SC), count = n())
+  summarize(LowBoundBin = min(SC), MaxBoundBin = max(SC), Samples = n())
 SummaryRealSampleList
+
+SummAllCWS <- econ3 %>% 
+  group_by(tag) %>% 
+  summarize(Totals = n())
+SummAllCWS
+
+SumPopulation <- econ3 %>% 
+  summarize(TotalPopulation = n())
+SumPopulation
+
+#join sumaries
+SumList <- left_join(SummaryRealSampleList, SummAllCWS)
+
+#make column for total # water systems (finite population count)
+#FPC = ((N - n)/(N - 1)) ^ 0.5
+# N = population size
+# n = sample size
+
+SumList <- SumList %>% 
+  group_by(tag) %>% 
+  mutate(FractionOfBin = Samples/Totals) %>% 
+  mutate(fpc = ((Totals - Samples)/(Totals - 1)) ^ 0.5) %>% 
+  mutate(weight = (Totals/Samples))
+SumList
+
+write.csv(SumList, "Datasets/SampleSummaries.csv")
+
+
 
 #make subsets of data from population set
 tag1<- econ3 %>% 
