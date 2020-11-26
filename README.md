@@ -1,6 +1,17 @@
 # EconImpact
 Purpose: Determine economic impacts to public water systems from COVID 19
 
+## Statistics
+Correlation between median household income and total dollars delinquent by zip code
+
+Compare revenue/expenses from 2019 to 2020 by year and by month (if significant)
+
+What characteristics predict monthes before assistance needed? Service connections #? Disdvantaged status? Location?
+
+Normalize delinquent accouts to service connections
+
+Total 
+
 ## To-Do List
 Determine margins of error for different sampling scenarios
 
