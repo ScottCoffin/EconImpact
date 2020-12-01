@@ -12,15 +12,23 @@ library(readxl) #to read in excel docs
 
 #### Load in Data ####
 #load in all systems considered for survey (created from econ_impacts_plots_pre_survey.R)
-allSystems <- read.csv("Datasets/econ3.csv", header =T, na.strings = "", stringsAsFactors = TRUE) #filtered dataset used to create original bins
+#allSystems <- read.csv("Datasets/econ3.csv", header =T, na.strings = "", stringsAsFactors = TRUE) #filtered dataset used to create original bins
+
+#ALL Community Water Systems
+AllSystems <- read_excel("Datasets/CWS_fmt_PWSID.xlsx", na = "")
+
 #load in systems list for survey (created from pre-survey analysis.R)
 surveyList <- read.csv("Datasets/surveyList.csv", header =T, na.strings = "", stringsAsFactors = TRUE)
 #load in completed surveys list (from Marielle)
 completedSurveys_old <- read_excel("Datasets/test_read_sm_systems_1125_4pm.xlsx", na = "") %>% 
   mutate(completed = "y") #to specify completed
-# load in updated list
-completedSurveys <- read_excel("Datasets/test_read_sm_systems_1130_11am.xlsx", na = "") %>% 
-  mutate(completed = "y") #to specify completed
+## load in updated list
+# completedSurveys <- read_excel("Datasets/test_read_sm_systems_1130_11am.xlsx", na = "") %>% 
+#   mutate(completed = "y") #to specify completed
+
+completedSurveys <- read.csv("Datasets/dataset_submitted.csv",  header =T, na.strings = "", stringsAsFactors = TRUE) %>% 
+   mutate(completed = "y") #to specify completed
+
 
 #### Clean Up Data ####
 #PWSIDs with a 0 in the beginning have them removed. Must put them back.
@@ -35,12 +43,48 @@ mutate(PWSID = paste0("CA",
 summary(nchar(surveyList$PWSID)) #to ensure all were converted
 
 # examine PWSIDs in completed surveys
-summary(nchar(completedSurveys$PWSID)) 
-# need to fix the multiple PWSIDs...
+summary(nchar(as.character(completedSurveys$PWSID)))
+# All good!
+
+
+#Reassign tags
+#specify bin labels
+Post.Bin <- c("Bin A", "Bin B", "Bin C", "Bin D")
+breaks = c(1, 1045, 3339, 6360, 9944) #breaks from original dataset
+#bucket values into bins
+bins <- cut(completedSurveys$Service.Connections,
+            breaks = breaks,
+            include.lowest = TRUE,
+            right = FALSE,
+            labels = Post.Bin)
+
+#inspect bins
+summary(bins)
+
+breaks
+#Store group as new column
+completedSurveys <-as_tibble(completedSurveys) %>% 
+  mutate(tag = case_when(
+    Service.Connections >= breaks[1] & Service.Connections < breaks[2] ~Post.Bin[1],
+    Service.Connections >= breaks[2] & Service.Connections < breaks[3] ~tags[2],
+    Service.Connections >= breaks[3] & Service.Connections <= breaks[4] ~tags[3],
+    Service.Connections >= breaks[4] & Service.Connections <= breaks[5] ~tags[4],
+  )) %>% 
+  mutate(logService.Connections = log10(Service.Connections))
+
+#tag is character vector, so convert to factor
+completedSurveys$tag <- factor(completedSurveys$tag,
+                    levels = tags,
+                    ordered = FALSE)
+
+surveyListTag <- surveyList %>% 
+  select(PWSID, tag, Water.System.No.)
+
+surveyListTag$Water.System.No. <- as.integer(surveyListTag$Water.System.No.)
 
 # Join survey list with completed list
-fullList <- left_join(surveyList, completedSurveys, by = "PWSID") %>% 
-  select(!c(X, Water.System.No., Unnamed, sys_name, district, filename, log.SC))
+fullList <- left_join(surveyListTag, completedSurveys, by = "Water.System.No.")  %>% 
+  select(!c(X)) #Water.System.No, Unnamed, sys_name, district, filename, log.SC))
 
 #convert unfilled surveys to no's
 fullList$completed <- fullList$completed %>%  
@@ -50,7 +94,70 @@ fullList$completed <- fullList$completed %>%
 #examine 
 summary(fullList$completed)  
 
-#### Summarize Data ####
+
+
+##### Summary Stats Method #####
+## This is done because many water systems can't be joined with sample list. Likely due to systems not being in original list
+  #Summarize bin for SURVEY LIST
+surveyListSumTag <- surveyList %>% 
+  group_by(tag) %>% 
+  summarize(total = n())
+surveyListSumTag
+#Summarize fee code for SURVEY LIST
+surveyListSumFeeCode <- surveyList %>% 
+  group_by(Fee.Code) %>% 
+  summarize(total = n())
+surveyListSumFeeCode
+#Summarize Regulating Agency for SURVEY LIST
+surveyListSumReg <- surveyList %>% 
+  group_by(Regulating.Agency) %>% 
+  summarize(total = n())
+surveyListSumReg
+
+#Determine proportion complete by Fee Code for COMPLETED SURVEYS
+feeCodeSummary <- completedSurveys %>% 
+  group_by(Fee.Code, completed) %>% 
+  summarize(num.completed = n()) 
+feeCodeSummary
+#Determine proportion complete by bin for COMPLETED SURVEYS
+tagSummary <- completedSurveys %>% 
+  group_by(tag, completed) %>% 
+  summarize(num.completed = n()) 
+tagSummary
+#Determine proportion complete by Regulating Agency for COMPLETED SURVEYS
+RegSummary <- completedSurveys %>% 
+  group_by(Regulating.Agency, completed) %>% 
+  summarize(num.completed = n()) 
+RegSummary
+
+#Join summary lists for FEE CODES
+feeCodeSummaryJoin<- left_join(feeCodeSummary, surveyListSumFeeCode) %>% 
+  mutate(proportion.completed = num.completed / total) %>% 
+  select(!completed)
+feeCodeSummaryJoin
+#Join summary lists for BINS
+tagSummaryJoin<- left_join(tagSummary, surveyListSumTag) %>% 
+  mutate(proportion.completed = num.completed / total) %>% 
+  select(!completed)
+tagSummaryJoin
+#Join summary list for REGS
+RegSummaryJoin<- left_join(RegSummary, surveyListSumReg) %>% 
+  mutate(proportion.completed = num.completed / total) %>% 
+  select(!completed)
+RegSummaryJoin
+# Transform Regulating Agency to just Numbers (manually in excel)
+#write.csv(RegSummaryJoin, file = "Datasets/RegSummaryJoin.csv") #to manually correct names
+RegNames<- read.csv("Datasets/RegSummaryJoin_fixedNames.csv")
+RegSummaryJoin <- RegNames %>% 
+  select(!Agency2)
+#ensure reg number is character
+RegSummaryJoin$Reg.num <- as.character(RegSummaryJoin$Reg.num)
+RegSummaryJoinDistricts <- RegSummaryJoin %>% 
+  filter(D.or.LPA == "D")
+RegSummaryJoinLPA <- RegSummaryJoin %>% 
+  filter(D.or.LPA == "LPA")
+
+#### Real List Summary Method ####
 #Determine proportion complete by bin
 tagSummary <- fullList %>% 
   group_by(tag, completed) %>% 
@@ -99,57 +206,112 @@ write.csv(feeCodeDistrictSummary, "plots/Completeness Summary by District and Fe
 
 #### Plots ####
 #### plot % completeness by factors ####
-#Plot by district
-plot.dist<- ggplot(data = districtSummary, aes(x = DS.Class, y = proportion.completed, fill = DS.Class)) +
+# Plot by Regulating Agency: Districts
+plot.reg.district<- ggplot(data = RegSummaryJoinDistricts, aes(x = Reg.num, y = proportion.completed, fill = D.or.LPA)) +
   geom_col() +
-  coord_cartesian(ylim = c(0.5,1))+
+  coord_cartesian(ylim = c(0.5,2.5))+
+  scale_fill_manual(values = cal_palette("superbloom1")) +
   geom_text(aes(label = num.completed),
             vjust = -1)+
-  scale_x_discrete(name = "Districts", 
-                    labels = c("1", "2", "3", "4", "5")) +
-  theme(legend.box.background = element_rect(color = "black"),
+  scale_x_discrete(name = "District Number") +
+  scale_y_continuous(name = "Completeness",
+                     labels = scales::percent) +
+  geom_hline(yintercept = 1.0, linetype = 'dashed') +
+  theme_minimal()+
+  theme(legend.position = "none",
+        legend.box.background = element_rect(color = "black"),
         legend.title = element_text(size = 14),
         legend.text = element_text(size = 14),
         axis.text = element_text(size = 14),
         axis.title = element_text(size = 14))
-plot.dist
+plot.reg.district
+
+# Plot by Regulating Agency: LPAs
+plot.reg.LPA<- ggplot(data = RegSummaryJoinLPA, aes(x = Reg.num, y = proportion.completed, fill = D.or.LPA)) +
+  geom_col() +
+  coord_cartesian(ylim = c(0.5,2.5))+
+  scale_fill_manual(values = cal_palette("superbloom3")) +
+  geom_text(aes(label = num.completed),
+            vjust = -1)+
+  scale_x_discrete(name = "LPA Number") +
+  scale_y_continuous(name = "Completeness",
+                     labels = scales::percent) +
+  geom_hline(yintercept = 1.0, linetype = 'dashed') +
+  labs(title = "LPA Completeness", caption = "11-30-2020")+
+  theme_minimal()+
+  theme(legend.position = "none",
+        legend.box.background = element_rect(color = "black"),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 14),
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 14))
+plot.reg.LPA
+
+#arrange together
+plotProportionCompleteLPADistrict <- grid.arrange(plot.reg.district, plot.reg.LPA,
+                                       ncol = 2,
+                                       top = textGrob("Survey Completion By District and LPA", gp=gpar(fontsize = 22, font=6)))
+#save
+ggsave(path = "plots",
+       filename = "proportionCompleteLPADistrict_11-30.png",
+       plotProportionCompleteLPADistrict,
+       width = 8,
+       scale = 2,
+       dpi = 500)
 
 #plot by fee code
-plot.feeCode <- ggplot(data = feeCodeSummary, aes(x = Fee.Code, y = proportion.completed, fill = Fee.Code)) +
+plot.feeCode <- ggplot(data = feeCodeSummaryJoin, #using summary data
+                       aes(x = Fee.Code, y = proportion.completed, fill = Fee.Code)) +
   geom_col() +
   coord_cartesian(ylim = c(0.5,1)) +
   geom_text(aes(label = num.completed),
             vjust = -1)+
-   scale_x_discrete(name = "Fee Code", 
-                   labels = c("Lrg Water System", "Disad. Lrg Cmmnty", "Disad. Smll Cmmnty", "Smll Cmmnty")) +
-  theme(legend.box.background = element_rect(color = "black"),
+  scale_fill_manual(values = cal_palette("superbloom3")) +
+  scale_x_discrete(name = "Fee Code", 
+                    labels = c("Lrg System", "Disad. Lrg Cmmnty", "Disad. Smll Cmmnty", "Smll Cmmnty"))+
+  scale_y_continuous(name = "Completeness",
+                     labels = scales::percent) +
+  geom_hline(yintercept = 0.8, linetype = 'dashed') +
+  theme_minimal() +
+  theme(legend.position = "none", #no key,
+        legend.box.background = element_rect(color = "black"),
         legend.title = element_text(size = 14),
         legend.text = element_text(size = 14),
         axis.text = element_text(size = 14),
-        axis.title = element_text(size = 14),
-        axis.text.x = element_text(size = 11))
+        axis.title = element_text(size = 18),
+        axis.text.x = element_text(size = 12))
 plot.feeCode
 
 # plot by bin
-plot.tag <- ggplot(data = tagSummary, aes(x = tag, y = proportion.completed, fill = tag)) +
+plot.tag <- ggplot(data = tagSummaryJoin, #using summary data 
+                   aes(x = tag, y = proportion.completed, fill = tag)) +
   geom_col()+
+  scale_fill_manual(values = cal_palette("superbloom2")) +
   coord_cartesian(ylim = c(0.5,1)) +
   geom_text(aes(label = num.completed),
             vjust = -1)+
-  theme(legend.box.background = element_rect(color = "black"),
+  scale_x_discrete(name = "Sampling Bin") +
+  scale_y_continuous(name = "Completeness",
+                     labels = scales::percent) +
+  labs(caption = "11-30-2020")+
+  geom_hline(yintercept = 0.8, linetype = 'dashed') +
+  theme_minimal() +
+  theme(legend.position = "none", #no key
+        legend.box.background = element_rect(color = "black"),
         legend.title = element_text(size = 12),
         legend.text = element_text(size = 14),
         axis.text = element_text(size = 14),
-        axis.title = element_text(size = 14))
+        axis.title = element_text(size = 18))
+plot.tag
 #arrange together
-plotProportionComplete <- grid.arrange(plot.dist, plot.feeCode, plot.tag,
+plotProportionComplete <- grid.arrange(plot.feeCode, plot.tag,
              ncol = 2,
-             top = textGrob("Proportion Completed", gp=gpar(fontsize = 22, font=1)))
+             top = textGrob("Survey Completion By Bin and Fee Code", gp=gpar(fontsize = 22, font=6)))
 #save
 ggsave(path = "plots",
-       filename = "proportionComplete.png",
+       filename = "proportionComplete_11-30.png",
        plotProportionComplete,
-       width = 5,
+       width = 8,
        scale = 2,
        dpi = 500)
 
