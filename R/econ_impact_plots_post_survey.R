@@ -16,9 +16,13 @@ allSystems <- read.csv("Datasets/econ3.csv", header =T, na.strings = "", strings
 #load in systems list for survey (created from pre-survey analysis.R)
 surveyList <- read.csv("Datasets/surveyList.csv", header =T, na.strings = "", stringsAsFactors = TRUE)
 #load in completed surveys list (from Marielle)
-completedSurveys <- read_excel("Datasets/test_read_sm_systems_1125_4pm.xlsx", na = "") %>% 
+completedSurveys_old <- read_excel("Datasets/test_read_sm_systems_1125_4pm.xlsx", na = "") %>% 
+  mutate(completed = "y") #to specify completed
+# load in updated list
+completedSurveys <- read_excel("Datasets/test_read_sm_systems_1130_11am.xlsx", na = "") %>% 
   mutate(completed = "y") #to specify completed
 
+#### Clean Up Data ####
 #PWSIDs with a 0 in the beginning have them removed. Must put them back.
 surveyList$Water.System.No. <- as.character(surveyList$Water.System.No.)
 #fix PWSIDs with missing CA and 0 heads
@@ -46,6 +50,7 @@ fullList$completed <- fullList$completed %>%
 #examine 
 summary(fullList$completed)  
 
+#### Summarize Data ####
 #Determine proportion complete by bin
 tagSummary <- fullList %>% 
   group_by(tag, completed) %>% 
@@ -78,13 +83,30 @@ districtSummary <- fullList %>%
   filter(completed == "y") %>% 
   select(!completed)
 
+# Determine percent complete by fee code AND District
+feeCodeDistrictSummary <- fullList %>% 
+  group_by(Fee.Code, completed, DS.Class) %>% 
+  filter(!DS.Class == "TD") %>% 
+  filter(!DS.Class == "NA") %>% 
+  filter(!DS.Class == "NR") %>% 
+  summarize(num.completed = n()) %>% 
+  mutate(total = sum(num.completed),
+         proportion.completed = num.completed / sum(num.completed)) %>% 
+  filter(completed == "y") %>% 
+  select(!completed)
+write.csv(feeCodeDistrictSummary, "plots/Completeness Summary by District and Fee Code.csv")
 
-# plot % completeness by factors
+
+#### Plots ####
+#### plot % completeness by factors ####
+#Plot by district
 plot.dist<- ggplot(data = districtSummary, aes(x = DS.Class, y = proportion.completed, fill = DS.Class)) +
   geom_col() +
   coord_cartesian(ylim = c(0.5,1))+
   geom_text(aes(label = num.completed),
             vjust = -1)+
+  scale_x_discrete(name = "Districts", 
+                    labels = c("1", "2", "3", "4", "5")) +
   theme(legend.box.background = element_rect(color = "black"),
         legend.title = element_text(size = 14),
         legend.text = element_text(size = 14),
@@ -92,17 +114,23 @@ plot.dist<- ggplot(data = districtSummary, aes(x = DS.Class, y = proportion.comp
         axis.title = element_text(size = 14))
 plot.dist
 
+#plot by fee code
 plot.feeCode <- ggplot(data = feeCodeSummary, aes(x = Fee.Code, y = proportion.completed, fill = Fee.Code)) +
   geom_col() +
   coord_cartesian(ylim = c(0.5,1)) +
   geom_text(aes(label = num.completed),
             vjust = -1)+
+   scale_x_discrete(name = "Fee Code", 
+                   labels = c("Lrg Water System", "Disad. Lrg Cmmnty", "Disad. Smll Cmmnty", "Smll Cmmnty")) +
   theme(legend.box.background = element_rect(color = "black"),
         legend.title = element_text(size = 14),
         legend.text = element_text(size = 14),
         axis.text = element_text(size = 14),
-        axis.title = element_text(size = 14))
+        axis.title = element_text(size = 14),
+        axis.text.x = element_text(size = 11))
+plot.feeCode
 
+# plot by bin
 plot.tag <- ggplot(data = tagSummary, aes(x = tag, y = proportion.completed, fill = tag)) +
   geom_col()+
   coord_cartesian(ylim = c(0.5,1)) +
@@ -124,3 +152,4 @@ ggsave(path = "plots",
        width = 5,
        scale = 2,
        dpi = 500)
+
