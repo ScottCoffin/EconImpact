@@ -35,11 +35,16 @@ https://www.ppic.org/blog/recession-safety-net-needed-for-states-small-water-sys
 https://efc.sog.unc.edu/sites/default/files/2020/North%20Carolina%20Utilities%20and%20COVID-19.pdf
 
 ### Survey Design Resources 
+#Latent Trait Analysis
+https://cran.r-project.org/web/packages/mirt/mirt.pdf
 
+#General workflow for survey analysis
 https://bookdown.org/jespasareig/Book_How_to_weight_a_survey/
 
+#R specific Tutorial
 https://www.datacamp.com/courses/analyzing-survey-data-in-r
 
+#R package
 https://cran.r-project.org/web/packages/survey/survey.pdf
 
 ## Meeting Notes 
