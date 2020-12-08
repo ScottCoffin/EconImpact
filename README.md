@@ -13,6 +13,9 @@ Normalize delinquent accouts to service connections
 Total 
 
 ## To-Do List
+Answer questions from group:
+  https://cawaterboards-my.sharepoint.com/:w:/r/personal/sean_mccarthy_waterboards_ca_gov/_layouts/15/guestaccess.aspx?e=SKaiI0&share=ETAwWQKs9BBOtI4h-j_yzxgBz816kvcnxs0y3vt-ac2LKg
+
 Determine margins of error for different sampling scenarios
 
 Test assumption that service connections # is indicator for water system finances (to the extent possible)
