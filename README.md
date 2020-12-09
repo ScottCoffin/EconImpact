@@ -4,18 +4,29 @@ Purpose: Determine economic impacts to public water systems from COVID 19
 ## Updates
 12-9-2020: final survey list dataset available as "Datasets/completedSurveys.csv"
 
+## To-Do List (assignments)
 
+(MP) 1) Classify systems as "high", "medium", "low" vulnerability
+        "high" = 3 months, "medium" = 6-9 months, "high" = >1 year
+
+(MP) 2) Join "Datasets/completedSurveys.csv" with zip codes and other demographic characteristics
+
+(MP) 3) Write Data Dictionary
+
+## Considerations/Best Practices
+
+Normalize delinquent accouts to service connections
 
 ## Data Analysis (Assignments)
 Data Analysis Questions (https://cawaterboards-my.sharepoint.com/:w:/r/personal/sean_mccarthy_waterboards_ca_gov/_layouts/15/guestaccess.aspx?e=SKaiI0&share=ETAwWQKs9BBOtI4h-j_yzxgBz816kvcnxs0y3vt-ac2LKg)
 
 (MP) 1. How many systems will likely require financial assistance to remain viable within 3/6/9/12 months? [STRAIGHTFORWARD]
 
-2. How many systems have depleted their reserve funds by 25/50/75/100 percent? Absolute dollar amounts, define bins, as percentage of average 2020 monthly expenses? Per connection would be comparable to other size systems, can check stats on which is more useful. [MODERATE]
+(MP) 2. How many systems have depleted their reserve funds by 25/50/75/100 percent? Absolute dollar amounts, define bins, as percentage of average 2020 monthly expenses? Per connection would be comparable to other size systems, can check stats on which is more useful. [MODERATE]
 
-3. How many systems have suffered revenue losses of 25/50/75/100 percent compared to 2019? [STRAIGHTFORWARD]
+(BR) 3. How many systems have suffered revenue losses of 25/50/75/100 percent compared to 2019? [STRAIGHTFORWARD]
 
-() 4. How many systems have secured loans or other short-term financing? [STRAIGHTFORWARD]
+() 4. How many systems have secured loans or other short-term financing? [STRAIGHTFORWARD] (yes/no, question #7)
 
 (MP) 5. What is the population served by systems with extreme/high/medium/low financial vulnerability? Criteria tied to number 1, amount of time before they are in financial crisis, use data from 2 and 3 to clarify level of financial vulnerability
 
@@ -60,18 +71,7 @@ a. Within those zip codes, which have significant numbers of households with ver
 22. What characteristics predict months before assistance needed? Service connections #? Disdvantaged status? Location? [SOPHISTICATED]
 
 
-## To-Do List (assignments)
 
-(MP) 1) Classify systems as "high", "medium", "low" vulnerability
-        "high" = 3 months, "medium" = 6-9 months, "high" = >1 year
-
-(MP) 2) Join "Datasets/completedSurveys.csv" with zip codes and other demographic characteristics
-
-
-## Considerations/Best Practices
-
-
-Normalize delinquent accouts to service connections
 
 
 
