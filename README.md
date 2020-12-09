@@ -9,7 +9,7 @@ Purpose: Determine economic impacts to public water systems from COVID 19
 
 
 ## Updates
-12-9-2020: final survey list dataset available as "Datasets/completedSurveys.csv"
+12-9-2020: final survey list dataset available as "Datasets/completedSurveys.csv"; joined list with ALL SYSTEMS: "Datasets/AllSystems_Surveys.csv"
 
 Analyses due December 18. Presentations first week of January
 
