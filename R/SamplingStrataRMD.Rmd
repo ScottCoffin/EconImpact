@@ -443,8 +443,8 @@ SummaryStrataList <-SampleList %>%
 SummaryStrataList
 
 
-breaks <- c(1, 725, 2132, 4048, 6530, 9818)
-tags <- c("Bin1", "Bin2", "Bin3", "Bin4", "Bin5")
+breaks <- c(3, 1009, 3128, 6219, 9890)
+tags <- c("Bin1", "Bin2", "Bin3", "Bin4")
 #make data table from breaks
 breaksdf <-tibble(log10(breaks))
 
@@ -518,7 +518,7 @@ FeeCodeDistributions <- sample3 %>%
   labs(x='LOG10 Service Connections',
        y = "Count",
        title = "Fee Code Distributions",
-       subtitle = "Jenk's Breaks shown in dotted lines")+
+       subtitle = "Genetically Optimized Strata shown in dotted lines")+
   scale_fill_discrete(name = "Fee Code", labels = c("Large Water System", "Disadvantaged Large Community Water System", "Disadvantaged Small Community Water System", "Small Community")) +
   geom_vline(data = breaksdf, mapping = aes(xintercept= log10(breaks)), linetype = 'dashed')
 

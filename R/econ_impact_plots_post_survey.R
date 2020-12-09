@@ -20,13 +20,13 @@ AllSystems <- read_excel("Datasets/CWS_fmt_PWSID.xlsx", na = "")
 #load in systems list for survey (created from pre-survey analysis.R)
 surveyList <- read.csv("Datasets/surveyList.csv", header =T, na.strings = "", stringsAsFactors = TRUE)
 #load in completed surveys list (from Marielle)
-completedSurveys_old <- read_excel("Datasets/test_read_sm_systems_1125_4pm.xlsx", na = "") %>% 
-  mutate(completed = "y") #to specify completed
+#completedSurveys_old <- read_excel("Datasets/test_read_sm_systems_1125_4pm.xlsx", na = "") %>% 
+ # mutate(completed = "y") #to specify completed
 ## load in updated list
 # completedSurveys <- read_excel("Datasets/test_read_sm_systems_1130_11am.xlsx", na = "") %>% 
 #   mutate(completed = "y") #to specify completed
 
-completedSurveys <- read.csv("Datasets/dataset_submitted.csv",  header =T, na.strings = "", stringsAsFactors = TRUE) %>% 
+completedSurveys <- read.csv("Datasets/dataset_submitted_1207.csv",  header =T, na.strings = "", stringsAsFactors = TRUE) %>% 
    mutate(completed = "y") #to specify completed
 
 
@@ -61,21 +61,30 @@ bins <- cut(completedSurveys$Service.Connections,
 #inspect bins
 summary(bins)
 
+#specify bin labels
+tags <- c("Bin A", "Bin B", "Bin C", "Bin D")
+
 breaks
 #Store group as new column
 completedSurveys <-as_tibble(completedSurveys) %>% 
   mutate(tag = case_when(
-    Service.Connections >= breaks[1] & Service.Connections < breaks[2] ~Post.Bin[1],
+    Service.Connections >= breaks[1] & Service.Connections < breaks[2] ~tags[1],
     Service.Connections >= breaks[2] & Service.Connections < breaks[3] ~tags[2],
     Service.Connections >= breaks[3] & Service.Connections <= breaks[4] ~tags[3],
     Service.Connections >= breaks[4] & Service.Connections <= breaks[5] ~tags[4],
   )) %>% 
   mutate(logService.Connections = log10(Service.Connections))
 
-#tag is character vector, so convert to factor
-completedSurveys$tag <- factor(completedSurveys$tag,
-                    levels = tags,
-                    ordered = FALSE)
+#convert tag to factor
+completedSurveys$tag <- as.factor(completedSurveys$tag)
+
+#final dataset (just completed)
+write.csv(completedSurveys, "Datasets/completedSurveys.csv")
+
+# #tag is character vector, so convert to factor
+# completedSurveys$tag <- factor(completedSurveys$tag,
+#                     levels = tag,
+#                     ordered = FALSE)
 
 surveyListTag <- surveyList %>% 
   select(PWSID, tag, Water.System.No.)
@@ -84,15 +93,17 @@ surveyListTag$Water.System.No. <- as.integer(surveyListTag$Water.System.No.)
 
 # Join survey list with completed list
 fullList <- left_join(surveyListTag, completedSurveys, by = "Water.System.No.")  %>% 
-  select(!c(X)) #Water.System.No, Unnamed, sys_name, district, filename, log.SC))
+  select(!c(X, tag.y, PWSID.x)) %>%  #Water.System.No, Unnamed, sys_name, district, filename, log.SC))
+  mutate(tag = tag.x, PWSID = PWSID.y) %>% 
+  select(!c(tag.x, PWSID.y, logService.Connections))
 
 #convert unfilled surveys to no's
 fullList$completed <- fullList$completed %>%  
   replace_na("n") %>% 
   as.factor()
 
-#examine 
-summary(fullList$completed)  
+#examine
+summary(fullList$completed)
 
 
 
@@ -253,7 +264,7 @@ plotProportionCompleteLPADistrict <- grid.arrange(plot.reg.district, plot.reg.LP
                                        top = textGrob("Survey Completion By District and LPA", gp=gpar(fontsize = 22, font=6)))
 #save
 ggsave(path = "plots",
-       filename = "proportionCompleteLPADistrict_11-30.png",
+       filename = "proportionCompleteLPADistrict_12-7.png",
        plotProportionCompleteLPADistrict,
        width = 8,
        scale = 2,
@@ -309,7 +320,7 @@ plotProportionComplete <- grid.arrange(plot.feeCode, plot.tag,
              top = textGrob("Survey Completion By Bin and Fee Code", gp=gpar(fontsize = 22, font=6)))
 #save
 ggsave(path = "plots",
-       filename = "proportionComplete_11-30.png",
+       filename = "proportionComplete_12-7.png",
        plotProportionComplete,
        width = 8,
        scale = 2,
