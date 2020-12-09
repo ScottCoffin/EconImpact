@@ -4,6 +4,8 @@ Purpose: Determine economic impacts to public water systems from COVID 19
 ## Updates
 12-9-2020: final survey list dataset available as "Datasets/completedSurveys.csv"
 
+Analyses due December 18. Presentations first week of January
+
 ## To-Do List (assignments)
 
 (MP) 1) Classify systems as "high", "medium", "low" vulnerability
