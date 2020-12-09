@@ -13,6 +13,8 @@ Purpose: Determine economic impacts to public water systems from COVID 19
 
 Analyses due December 18. Presentations first week of January
 
+Powerpoint https://cawaterboards-my.sharepoint.com/:p:/g/personal/bethany_robinson_waterboards_ca_gov/Ea9ABxFCT-JOo9E6T1FK2yQBDWHxxYuEplBFO5FbS8jjwg?e=4%3AWSKGYJ&at=9&CID=dcde4a43-b0d0-a085-600f-7a2ca1fbccfa
+
 ## To-Do List (assignments)
 
 (MP) 1) Classify systems as "high", "medium", "low" vulnerability
