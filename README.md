@@ -1,7 +1,9 @@
+**The Marsupials**
+![](https://media.giphy.com/media/10mHaEBOTBxUvS/giphy.gif)
+
 # EconImpact
 Purpose: Determine economic impacts to public water systems from COVID 19
 
-![](https://media.giphy.com/media/10mHaEBOTBxUvS/giphy.gif)
 
 ## Updates
 12-9-2020: final survey list dataset available as "Datasets/completedSurveys.csv"
