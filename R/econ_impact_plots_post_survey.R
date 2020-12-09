@@ -106,6 +106,41 @@ fullList$completed <- fullList$completed %>%
 summary(fullList$completed)
 
 
+#### Join survey list with FULL LIST ####
+AllSystems$Service.Connections<-  AllSystems$`Service Connections`
+
+#Store TAG as new column in FULL LIST
+AllSystems <-as_tibble(AllSystems) %>% 
+  mutate(tag = case_when(
+    Service.Connections >= breaks[1] & Service.Connections < breaks[2] ~tags[1],
+    Service.Connections >= breaks[2] & Service.Connections < breaks[3] ~tags[2],
+    Service.Connections >= breaks[3] & Service.Connections <= breaks[4] ~tags[3],
+    Service.Connections >= breaks[4] & Service.Connections <= breaks[5] ~tags[4])) 
+
+#convert tag to factor
+AllSystems$tag <- as.factor(AllSystems$tag)
+summary(AllSystems$tag)
+
+AllSystems$Water.System.No. <- AllSystems$`Water System No.`
+
+AllSystems_Surveys <- left_join(AllSystems, completedSurveys, by = "Water.System.No.")  %>% 
+  select(!c(X, PWSID.x)) %>%  #Water.System.No, Unnamed, sys_name, district, filename, log.SC))
+  mutate(PWSID = PWSID.y, Population = Population.x, tag = tag.y) %>% 
+  select(!c(PWSID.y, tag.y, logService.Connections, Population.x, Water.System.No.:Last.SNSV))
+  
+#convert unfilled surveys to no's
+AllSystems_Surveys$completed <- AllSystems_Surveys$completed %>%  
+  replace_na("n") %>% 
+  as.factor() 
+
+#convert all characters to factors
+AllSystems_Surveys <- AllSystems_Surveys %>% 
+  mutate_if(is.character, as.factor)
+
+#examine
+summary(AllSystems_Surveys$completed)
+
+write.csv(AllSystems_Surveys,"Datasets/AllSystems_Surveys.csv")
 
 ##### Summary Stats Method #####
 ## This is done because many water systems can't be joined with sample list. Likely due to systems not being in original list
