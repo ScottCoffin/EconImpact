@@ -13,6 +13,10 @@ Purpose: Determine economic impacts to public water systems from COVID 19
 
 (MP) 3) Write Data Dictionary
 
+(SC) 4) Weight responses
+
+(SC) 5) Join sample list with all systems
+
 ## Considerations/Best Practices
 
 Normalize delinquent accouts to service connections
@@ -26,21 +30,21 @@ Data Analysis Questions (https://cawaterboards-my.sharepoint.com/:w:/r/personal/
 
 (BR) 3. How many systems have suffered revenue losses of 25/50/75/100 percent compared to 2019? [STRAIGHTFORWARD]
 
-() 4. How many systems have secured loans or other short-term financing? [STRAIGHTFORWARD] (yes/no, question #7)
+(BR) 4. How many systems have secured loans or other short-term financing? [STRAIGHTFORWARD] (yes/no, question #7). Required weighting
 
 (MP) 5. What is the population served by systems with extreme/high/medium/low financial vulnerability? Criteria tied to number 1, amount of time before they are in financial crisis, use data from 2 and 3 to clarify level of financial vulnerability
 
 (MP) a. What are the demographic characteristics of populations served by systems with extreme/high financial vulnerability? Characteristics in #11 6. How many systems were unable to provide survey responses due to inadequate financial management (i.e., did not retain financial data from 2019)? Can we summarize why inadequate responses were provided? Need to review comments for explanations. Common categories? Missing revenue/expense data, reasons, Marielle does have master sheet
 
-7. What is the total amount of household water debt accumulated since the beginning of the COVID-19 emergency? [STRAIGHTFORWARD]
+(SC) 7. What is the total amount of household water debt accumulated since the beginning of the COVID-19 emergency? [MODERATE, REQUIRES WEIGHTING, COMBINING WITH ALL SYSTEMS]
 
-8. What proportion of the household water debt is very high/high/medium/low? Also as a percentage of total service connections. [STRAIGHTFORWARD]
+(SC) 8. What proportion of the household water debt is very high/high/medium/low? Also as a percentage of total service connections. [MODERATE, COMBINING WITH ALL SYSTEMS]
 
 (MP) 9. Which zip codes have large numbers of households with water debt? Percentage of total service connections. [SOPHISTICATED]
 
 a. Within those zip codes, which have significant numbers of households with very high/high debt levels? Bins based on increments of $100, need to collapse into fewer groups. [SOPHISTICATED]
 
-10. What are the demographic characteristics of the zip codes with high numbers of households in debt and high levels of debt? Look at entire surveyed population in zip codes. [MODERATE]
+(MP) 10. What are the demographic characteristics of the zip codes with high numbers of households in debt and high levels of debt? Look at entire surveyed population in zip codes. [MODERATE]
 
 (SC) 11. What correlations exist between key demographic variables (e.g., race, income, age) and water debt? [SOPHISTICATED]
 
@@ -48,29 +52,27 @@ a. Within those zip codes, which have significant numbers of households with ver
 
 (SC) 13. What correlations exist between current health and economic indicators (e.g., local/regional unemployment rates, COVID-19 prevalence) and water debt? Compare with number of households facing eviction. [SOPHISTICATED]
 
-14. How many water systems are applying late fees to households with water bill debt? (split by system classifications) [MODERATE]
+(MP) 14. How many water systems are applying late fees to households with water bill debt? (split by system classifications) [MODERATE] LARGE SYSTEMS ONLY
 
   a. How many households have late fees added to their unpaid bill debt?
 
-15. How many systems are currently offering extended repayment options? [STRAIGHTFORWARD]
+(MP) 15. How many systems are currently offering extended repayment options? [STRAIGHTFORWARD]
 
   a. What population is served by those systems?
 
-16. How many small systems are financially connected with other small/medium/large systems and operated as a single entity? (Cal Water, Cal-Am, Golden State Water, Tuolumne Utilities District, Santa Clarita Valley Water Agency, others?) Some surveys had to be dropped since these systems are part of larger conglomerates/rate making areas. This could show the benefits of what we are trying to achieve through financial/managerial consolidations.
+(MP) 16. How many small systems are financially connected with other small/medium/large systems and operated as a single entity? (Cal Water, Cal-Am, Golden State Water, Tuolumne Utilities District, Santa Clarita Valley Water Agency, others?) Some surveys had to be dropped since these systems are part of larger conglomerates/rate making areas. This could show the benefits of what we are trying to achieve through financial/managerial consolidations. [STRAIGHTFOWARD, REQUIRES EMAIL TO DISTRICTS)
 
-17. For systems with combined bills, what proportion of total household debt is drinking water service debt? [STRAIGHTFORWARD]
+(MP) 17. For systems with combined bills, what proportion of total household debt is drinking water service debt? [LARGE SYSTEM]
 
-18. Loss of revenue due to loss of business customers, could be permanent, difference in revenue amounts from 2020-2019 vs total household debt, also compare with percentage of resid. commercial [SOPHISTICATED]
+(NA) 18. Loss of revenue due to loss of business customers, could be permanent, difference in revenue amounts from 2020-2019 vs total household debt, also compare with percentage of resid. commercial [CAN'T ANSWER]
 
 (ALL/BR) 19. Information from comments about number of systems reporting household debt due to inability to shutoff customers, categories to describe comments [SOPHISTICATED/TEDIOUS]
 
-20. Determine margins of error for different sampling scenarios. [STRAIGHTFORWARD]
+(BR) 20. Determine margins of error. [STRAIGHTFORWARD]
 
-21. Compare revenue/expenses from 2019 to 2020 by year and by month (if significant). [SOPHISTICATED/NO DATA]
+(BR) 21. Compare revenue/expenses from 2019 to 2020 by year and by month (if significant). [SOPHISTICATED/NO DATA]
 
-22. What characteristics predict months before assistance needed? Service connections #? Disdvantaged status? Location? [SOPHISTICATED]
-
-
+(BR) 22. What characteristics predict months before assistance needed? Service connections #? Disdvantaged status? Location? [SOPHISTICATED]
 
 
 
