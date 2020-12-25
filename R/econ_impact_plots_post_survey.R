@@ -26,9 +26,9 @@ surveyList <- read.csv("Datasets/surveyList.csv", header =T, na.strings = "", st
 # completedSurveys <- read_excel("Datasets/test_read_sm_systems_1130_11am.xlsx", na = "") %>% 
 #   mutate(completed = "y") #to specify completed
 
-completedSurveys <- read.csv("Datasets/dataset_submitted_1207.csv",  header =T, na.strings = "", stringsAsFactors = TRUE) %>% 
-   mutate(completed = "y") #to specify completed
-
+completedSurveys <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Small System Financial Qs") %>% 
+   mutate(responded = "y")   #to specify completed
+  
 
 #### Clean Up Data ####
 #PWSIDs with a 0 in the beginning have them removed. Must put them back.
@@ -52,7 +52,7 @@ summary(nchar(as.character(completedSurveys$PWSID)))
 Post.Bin <- c("Bin A", "Bin B", "Bin C", "Bin D")
 breaks = c(1, 1045, 3339, 6360, 9944) #breaks from original dataset
 #bucket values into bins
-bins <- cut(completedSurveys$Service.Connections,
+bins <- cut(completedSurveys$Service_Connections,
             breaks = breaks,
             include.lowest = TRUE,
             right = FALSE,
@@ -60,7 +60,6 @@ bins <- cut(completedSurveys$Service.Connections,
 
 #inspect bins
 summary(bins)
-
 #specify bin labels
 tags <- c("Bin A", "Bin B", "Bin C", "Bin D")
 
@@ -68,18 +67,21 @@ breaks
 #Store group as new column
 completedSurveys <-as_tibble(completedSurveys) %>% 
   mutate(tag = case_when(
-    Service.Connections >= breaks[1] & Service.Connections < breaks[2] ~tags[1],
-    Service.Connections >= breaks[2] & Service.Connections < breaks[3] ~tags[2],
-    Service.Connections >= breaks[3] & Service.Connections <= breaks[4] ~tags[3],
-    Service.Connections >= breaks[4] & Service.Connections <= breaks[5] ~tags[4],
-  )) %>% 
-  mutate(logService.Connections = log10(Service.Connections))
+    Service_Connections >= breaks[1] & Service_Connections < breaks[2] ~tags[1],
+    Service_Connections >= breaks[2] & Service_Connections < breaks[3] ~tags[2],
+    Service_Connections >= breaks[3] & Service_Connections <= breaks[4] ~tags[3],
+    Service_Connections >= breaks[4] & Service_Connections <= breaks[5] ~tags[4],
+  ))# %>% 
+  #mutate(logService.Connections = log10(Service.Connections))
 
 #convert tag to factor
 completedSurveys$tag <- as.factor(completedSurveys$tag)
+summary(completedSurveys$tag)
+completedSurveys <- completedSurveys %>% 
+  filter(Service_Connections < 10000)
 
 #final dataset (just completed)
-write.csv(completedSurveys, "Datasets/completedSurveys.csv")
+#write.csv(completedSurveys, "Datasets/completedSurveys.csv")
 
 # #tag is character vector, so convert to factor
 # completedSurveys$tag <- factor(completedSurveys$tag,
@@ -87,24 +89,28 @@ write.csv(completedSurveys, "Datasets/completedSurveys.csv")
 #                     ordered = FALSE)
 
 surveyListTag <- surveyList %>% 
-  select(PWSID, tag, Water.System.No.)
+  select(PWSID, tag, Water.System.No.) %>% 
+  mutate(requested = "y")
 
 surveyListTag$Water.System.No. <- as.integer(surveyListTag$Water.System.No.)
 
 # Join survey list with completed list
-fullList <- left_join(surveyListTag, completedSurveys, by = "Water.System.No.")  %>% 
-  select(!c(X, tag.y, PWSID.x)) %>%  #Water.System.No, Unnamed, sys_name, district, filename, log.SC))
-  mutate(tag = tag.x, PWSID = PWSID.y) %>% 
-  select(!c(tag.x, PWSID.y, logService.Connections))
+fullList <- full_join(surveyListTag, completedSurveys, by = "PWSID")  #%>% 
+  #select(!c(X, tag.y, PWSID.x)) %>%  #Water.System.No, Unnamed, sys_name, district, filename, log.SC))
+  #mutate(tag = tag.x, PWSID = PWSID.y) %>% 
+  #select(!c(tag.x, PWSID.y, logService.Connections))
 
 #convert unfilled surveys to no's
-fullList$completed <- fullList$completed %>%  
+fullList$responded <- fullList$responded %>%  
+  replace_na("n") %>% 
+  as.factor()
+fullList$requested <- fullList$requested %>%  
   replace_na("n") %>% 
   as.factor()
 
 #examine
-summary(fullList$completed)
-
+summary(fullList$responded)
+summary(fullList$requested)
 
 #### Join survey list with FULL LIST ####
 AllSystems$Service.Connections<-  AllSystems$`Service Connections`
@@ -123,24 +129,47 @@ summary(AllSystems$tag)
 
 AllSystems$Water.System.No. <- AllSystems$`Water System No.`
 
-AllSystems_Surveys <- left_join(AllSystems, completedSurveys, by = "Water.System.No.")  %>% 
-  select(!c(X, PWSID.x)) %>%  #Water.System.No, Unnamed, sys_name, district, filename, log.SC))
-  mutate(PWSID = PWSID.y, Population = Population.x, tag = tag.y) %>% 
-  select(!c(PWSID.y, tag.y, logService.Connections, Population.x, Water.System.No.:Last.SNSV))
+
+AllSystems_Surveys <- left_join(AllSystems, fullList, by = "PWSID")  #%>% 
+  #select(!c(X, PWSID.x)) %>%  #Water.System.No, Unnamed, sys_name, district, filename, log.SC))
+  #mutate(PWSID = PWSID.y, Population = Population.x, tag = tag.y)
+  #select(!c(PWSID.y, tag.y, logService.Connections, Population.x, Water.System.No.:Last.SNSV))
   
-#convert unfilled surveys to no's
-AllSystems_Surveys$completed <- AllSystems_Surveys$completed %>%  
+#denote which were not requested in full list
+AllSystems_Surveys$requested <- AllSystems_Surveys$requested %>%  
   replace_na("n") %>% 
   as.factor() 
 
 #convert all characters to factors
 AllSystems_Surveys <- AllSystems_Surveys %>% 
+  filter(Service.Connections < 10000) %>% 
+  mutate_if(is.character, as.factor) %>% 
+  mutate(voluntary = case_when(requested == "n" & responded == "y" ~ "y",
+                               requested == "y" & responded == "y" ~ "n",
+                               requested == "y" & responded == "n" ~ "no.response")) %>% 
+  mutate(tag = case_when(
+    Service.Connections >= breaks[1] & Service.Connections < breaks[2] ~tags[1],
+    Service.Connections >= breaks[2] & Service.Connections < breaks[3] ~tags[2],
+    Service.Connections >= breaks[3] & Service.Connections <= breaks[4] ~tags[3],
+    Service.Connections >= breaks[4] & Service.Connections <= breaks[5] ~tags[4])) %>% 
   mutate_if(is.character, as.factor)
 
+AllSystems_Surveys$voluntary <-AllSystems_Surveys$voluntary %>% 
+  as.character() %>% 
+  replace_na("not.requested") %>% 
+  as.factor()
+summary(AllSystems_Surveys$voluntary)
+
 #examine
-summary(AllSystems_Surveys$completed)
+summary(AllSystems_Surveys$requested)
+summary(AllSystems_Surveys$responded)
+
+
+AllSystems_Surveys %>% group_by(requested, responded) %>% 
+  summarize(n())
 
 write.csv(AllSystems_Surveys,"Datasets/AllSystems_Surveys.csv")
+#note that after writing to csv, I manually cleaned up in excel to save time. Final file for 
 
 ##### Summary Stats Method #####
 ## This is done because many water systems can't be joined with sample list. Likely due to systems not being in original list
@@ -283,7 +312,7 @@ plot.reg.LPA<- ggplot(data = RegSummaryJoinLPA, aes(x = Reg.num, y = proportion.
   scale_y_continuous(name = "Completeness",
                      labels = scales::percent) +
   geom_hline(yintercept = 1.0, linetype = 'dashed') +
-  labs(title = "LPA Completeness", caption = "11-30-2020")+
+  labs(title = "LPA Completeness", caption = "12-07-2020")+
   theme_minimal()+
   theme(legend.position = "none",
         legend.box.background = element_rect(color = "black"),
@@ -339,7 +368,7 @@ plot.tag <- ggplot(data = tagSummaryJoin, #using summary data
   scale_x_discrete(name = "Sampling Bin") +
   scale_y_continuous(name = "Completeness",
                      labels = scales::percent) +
-  labs(caption = "11-30-2020")+
+  labs(caption = "12-07-2020")+
   geom_hline(yintercept = 0.8, linetype = 'dashed') +
   theme_minimal() +
   theme(legend.position = "none", #no key
