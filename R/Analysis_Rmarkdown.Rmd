@@ -32,6 +32,10 @@ library(sampling) #to calculate probabilities
 library(DT) #datatable for nice printing
 library(lattice)
 library(PracTools) #for adjusting weights to non-response
+library(RColorBrewer) #colors
+library(pheatmap) #pretty heat maps
+library(aod) #chi-square test
+library(finalfit) #odds ratio plotting
 options(scipen = 9999)
 options(dplyr.width = Inf)
 
@@ -45,16 +49,16 @@ options(dplyr.width = Inf)
 ##### Read in Data #####
 #excel doc contains individual spreadsheets for small/medium and large PWS'. Also one big spreadsheet for zip codes. Read in smalls/medium and large individually, but join both to zip
 #just completed
-smalls <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Small System Financial Qs") 
-#just completed
-larges <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Large System Financial Qs") 
-#zip codes for joining
-zip <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Combined Zip Table")
-#for comparing all data
-AllPopConnections <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Population and Connections") 
-#ALL Community Water Systems
-AllSystems <- read_excel("Datasets/CWS_fmt_PWSID.xlsx", na = "") 
-## Joined list of surveys requested, responded, voluntary with all response data generated from econ_impacts_plots_post_survey.R script
+# smalls <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Small System Financial Qs") 
+# #just completed
+# larges <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Large System Financial Qs") 
+# #zip codes for joining
+# zip <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Combined Zip Table")
+# #for comparing all data
+# AllPopConnections <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Population and Connections") 
+# #ALL Community Water Systems
+# AllSystems <- read_excel("Datasets/CWS_fmt_PWSID.xlsx", na = "") 
+# ## Joined list of surveys requested, responded, voluntary with all response data generated from econ_impacts_plots_post_survey.R script
 allSmalls <- read.csv("Datasets/AllSystems_Surveys_final.csv", stringsAsFactors = TRUE) %>%  filter(Service_Connections <10000) %>% 
   filter(Fee_Code !="WH") %>%  #filter out wholesalers 
   filter(Fee_Code !="N1") %>% #transient non-community water systems
@@ -66,19 +70,19 @@ pop_weighted_characteristics <- read.csv("Datasets/pop_weighted_characteristics.
 risk_scores <- read_excel("Python/risk_scores.xlsx") %>% mutate_if(is.character, as.factor) %>% select(-c(Service_Connections, Population, Bin, months))
 
 ##### Cleanup and Join #####
-#responses for smalls
-smalls <- smalls %>% mutate_if(is.character, as.factor) 
-#responses for larges
-larges <- larges %>% mutate_if(is.character, as.factor) 
+# #responses for smalls
+# smalls <- smalls %>% mutate_if(is.character, as.factor) 
+# #responses for larges
+# larges <- larges %>% mutate_if(is.character, as.factor) 
 #zip codes for all
 zip <- zip %>% mutate_if(is.character, as.factor)
 zip <- right_join(zip, pop_weighted_characteristics, by = "PWSID")
 zip <- left_join(zip, risk_scores, by ="PWSID")
 #join zip and income characteristics to smalls and larges
 allSmalls <- left_join(allSmalls, zip) %>% distinct(PWSID, .keep_all = TRUE) %>%  droplevels()
-smalls <- left_join(smalls, zip, by = "PWSID") %>% distinct(PWSID, .keep_all = TRUE) #must clean dupes
-larges <- left_join(larges, zip, by = "PWSID") %>% distinct(PWSID, .keep_all = TRUE) #must clean dupes
-#keep it clean
+# smalls <- left_join(smalls, zip, by = "PWSID") %>% distinct(PWSID, .keep_all = TRUE) #must clean dupes
+# larges <- left_join(larges, zip, by = "PWSID") %>% distinct(PWSID, .keep_all = TRUE) #must clean dupes
+# #keep it clean
 rm(zip)
 rm(pop_weighted_characteristics)
 rm(risk_scores)
@@ -86,6 +90,7 @@ rm(risk_scores)
 ## Recode Variables
 Now that we've read in the data, let's recode some factor variables as either dichotomous or continuous index variables.
 ```{r recode variables}
+#turn months before assistance from categorical to continuous variable
 allSmalls %<>%  mutate(months_before_assist_num = case_when(months_before_assist == "A" ~ 1,
                                                            months_before_assist == "B" ~ 2,
                                                            months_before_assist == "C" ~ 3,
@@ -104,35 +109,165 @@ allSmalls %<>%
 #provide integer tag for submetered status
 allSmalls %<>% 
   mutate(submetered_1.0 = case_when(submetered_YN == "Y" ~ 1,submetered_YN == "N" ~ 0)) 
-#useful for comparisons
+#useful for comparisons for voluntary data
 allSmalls.requested.voluntary <- allSmalls %>% filter(voluntary == "n" |voluntary == "y" | voluntary == "no.response")
+# Create dataset of survey list with both respondents and non-respondents, but NOT volunteers (not request but responded)
+allSmalls.requested.responded <- allSmalls %>%  filter((voluntary == "n"))
+#Separate volunteer samples for comparison
+allSmalls.volunteers <- allSmalls.requested.responded <- allSmalls %>%  filter((voluntary == "y"))
+#Dataset for all responses (volunteers and requested)
+allSmalls.responded <- allSmalls %>% 
+  filter(responded == "y")
 ```
-# Handling Missing Data
+# Examining Completion of Questions
 
 Since data are missing for some categories within responses, we have three choices:
 1) listwise-deletion: remove rows that contain missing data. This will, of course, reduce the strength of the dataset.
 2) mean/median substitution: another quick fix that takes the mean/median of the existing data points and substitutes the missing data points. This would obviously bias the analysis since it decreases variance. 
 3) Multiple imputation: With this approach, rather than replacing missing values with a single value, we use the distribution of the observed data/variables to estimate multiple possible values for the data points. This allows us to account for the uncertainty around the true value, and obtain approximately unbiased estimates (under certain conditions). Moreover, accounting for uncertainty allows us to calculate standard errors around estimations, which in turn leads to a better sense of uncertainty for the analysis.
 
-To decide which option to use, let's examine how much data is missing from our survey.
+To decide which option to use, let's first examine how much data is missing from our survey.
 ```{r mean imputation}
-sub<- allSmalls.requested.responded %>% select(cash_reserve_restricted, cash_reserve_total, months_before_assist, delinquent_num_acc)
+#make subset of data showing complete cases (rows that have full coverage of variables) for the systems that COMPLETED the survey and were asked to participate (i.e. no volunteers).
+sub <- allSmalls.requested.responded %>% select(cash_reserve_unrestricted, cash_reserve_restricted, cash_reserve_total, months_before_assist, delinquent_num_acc, delinquent_amount_dollars)
 #how many NA's are present total
 #sum(is.na(sub))
 #how many complete cases total
 #sum(complete.cases(sub))
 sum(complete.cases(sub)) / nrow(sub)
 ```
-We can see that a rather large proportion of survey data is missing just for the selected few variables. If we were to simply exclude incomplete cases, we would trim most of the dataset. Let's look deeper at the number of missing values in each column.
+We can see that a rather large proportion (41%!) of survey data is missing just for the selected few variables, which are considered to be the primary responses of interest in this survey. If we were to simply exclude incomplete cases, we would trim a substantive poriton of the dataset, potentially reducing the power of the study to unnacceptable levels. Let's look deeper at the number of missing values in each column.
 ```{r}
-#view by item
-allSmalls.requested.responded %>%
-    map_df(function(x) sum(is.na(x))) %>%
-    gather(feature, num_nulls) %>%
-    print(n = 100) %>% 
-  arrange(desc(num_nulls))
+## view by item for all smalls that responded, separating volunteers
+# volunteerMissing <- allSmalls.volunteers %>%
+#   select(cash_reserve_unrestricted, cash_reserve_restricted, cash_reserve_total, months_before_assist, delinquent_num_acc, delinquent_amount_dollars) %>%
+#    map_df(function(x) sum(is.na(x))) %>%
+#     gather(feature, num_nulls) %>%
+#     print(n = 100) %>%
+#   arrange(desc(num_nulls))
+# 
+# requestedMissing <-  sub %>%
+#     map_df(function(x) sum(is.na(x))) %>%
+#     gather(feature, num_nulls) %>%
+#     print(n = 100) %>%
+#   arrange(desc(num_nulls))
+# #tabulate
+# right_join(volunteerMissing,requestedMissing,by = "feature") %>%  rename("volunteer" = num_nulls.x, "requested" = num_nulls.y)
+# #simple, but long table
+
+completenessSummary <- allSmalls %>%
+  filter(voluntary == "y" |voluntary == "n") %>%
+  select(voluntary, cash_reserve_unrestricted, cash_reserve_restricted, cash_reserve_total, months_before_assist, delinquent_num_acc, delinquent_amount_dollars) %>%
+  group_by(voluntary) %>%
+   summarise_all((name = ~sum(is.na(.))/length(.))) 
+#convert to matrix and transpose
+transposed <- as.data.frame(t(as.matrix(completenessSummary[2:7])))
+#reassign column names
+colnames(transposed) <- c("Requested", "Voluntary")
+transposed
 ```
-It is necessary to perform multiple imputation to preserve our dataset. I will use the mice (which stands for Multivariate Imputation by Chained Equations) package which is developed by Stef van Buuren. The basic steps of multiple imputation are described by Rubin (1976). *Citation: Rubin, Donald B. 1976. “Inference and missing data.” Biometrika 63, no. 3: 581-592.*
+We can see here that willingness to provide information on cash reserve (restricted or unrestricted) is low, compared to providing information on delinquency for both the volunteers and non-volunteers. Let's view this as a barchart.
+```{r}
+#format as matrix
+MissingMatrix <- data.matrix(transposed)
+#build heatmap
+pheatmap(MissingMatrix,
+                           main = "Data Missing by Volunteer or Requested", #title
+                           fontsize = 12,
+                           cluster_rows = FALSE, cluster_cols = FALSE,#disable dendrograms
+                           display_numbers = TRUE,
+                           treeheight_row = 0, treeheight_col = 0, #keeps clustering after dropping dendrograms
+                           col = brewer.pal(n = 9, name = "PuBu")) #blue color scheme with 9 colors)
+```
+It's clear that both the voluntary and requested surveyed water systems provided similiar levels of information in this survey. Let's see if there were differences in response completeness by sampling bin. 
+
+```{r}
+tagCompletenessSummary <- allSmalls %>%
+  filter(voluntary == "y" |voluntary == "n") %>%
+  select(tag, cash_reserve_unrestricted, cash_reserve_restricted, cash_reserve_total, months_before_assist, delinquent_num_acc, delinquent_amount_dollars) %>%
+  group_by(tag) %>%
+   summarise_all((name = ~sum(is.na(.))/length(.)))
+tagCompletenessSummary
+```
+Again, it may be easier to view as a heatmap.
+```{r}
+#convert to matrix and transpose
+transposedTag <- as.data.frame(t(as.matrix(tagCompletenessSummary[2:7])))
+#reassign column names
+colnames(transposedTag) <- c("Bin A", "Bin B", "Bin C", "Bin D")
+transposedTag
+#format as matrix
+MissingMatrixTag <- data.matrix(transposedTag)
+#build heatmap
+pheatmap(MissingMatrixTag,
+                           main = "Data Missing by Bin", #title
+                           fontsize = 12,
+                           cluster_rows = FALSE, cluster_cols = FALSE,#disable dendrograms
+                           display_numbers = TRUE,
+                           treeheight_row = 0, treeheight_col = 0, #keeps clustering after dropping dendrograms
+                           col = brewer.pal(n = 9, name = "PuBu")) #blue color scheme with 9 colors)
+```
+There seems to be a clear step-wise trend for the willingness to report restricted and unresicted  cash reserve by size (Bin A are smallest, Bin D are largest). Luckily, no other trends appear. Let's see if there's a relationship between reporting of this value and service connections.
+
+```{r}
+#convert numeric to 1
+allSmalls.requested.responded <- allSmalls.requested.responded %>% 
+  mutate(cash_reserve_restricted_NA = case_when(cash_reserve_restricted >= 0 ~ 1))
+
+#Convert NA to 0
+allSmalls.requested.responded$cash_reserve_restricted_NA <- allSmalls.requested.responded$cash_reserve_restricted_NA %>% replace_na(0) %>% as.factor()
+#convert to factor
+allSmalls.requested.responded <- allSmalls.requested.responded %>% 
+  mutate(cash_reserve_restricted_NA_yn = case_when(cash_reserve_restricted_NA == "0" ~ "no",
+                                                   cash_reserve_restricted_NA == "1" ~ "yes")) 
+allSmalls.requested.responded$cash_reserve_restricted_NA_yn <- as.factor(allSmalls.requested.responded$cash_reserve_restricted_NA_yn)
+
+#examine relationship of response to restricted reseved cash question with number of  service connections
+
+lgit<- glm(cash_reserve_restricted_NA ~ Service_Connections + Fee_Code, 
+            data = allSmalls.requested.responded, family = "binomial")
+summary(lgit)
+```
+Here we can see that a significant relationship exists between number of service connections and the response level for the question regarding restricted cash reserves. There also seems to be a significant relationship between the disadvantaged community larges, which is related to service connections.
+
+This may also be visualized in a conditional density plot.
+```{r}
+cdplot(cash_reserve_restricted_NA_yn ~ Service_Connections, data = allSmalls.requested.responded,
+       main = "Conditional Density Plot of Response for Restricted Cash Reserves", xlab = "Number of Service Connections", ylab = "Reponse Given for Restricted Cash Reserves?")
+```
+
+Let's further test these grouping differences in response with a chi-squared test.  
+```{r}
+wald.test(b = coef(lgit), #coefficients from logit model 
+          Sigma = vcov(lgit), #variance covariance matrix of the error terms
+          Terms = 3:5) #categorical terms (fee codes)
+```
+The p-value of 0.0035 again suggests that fee code is a significant predictor for willingness to respond to this question. An easier way to conceptualize this may be through odds-ratios.
+```{r}
+#exponentiate the coefficients (i.e. create odds-ratios)
+round(exp(cbind(OddsRatio = coef(lgit), confint(lgit))),2)
+```
+Now we can clearly see that disadvantaged community Larges are 3.43 times more likely to report their unrestricted cash reserves (97.5% CI: 1.76 - 6.98). Odds ratios are plotted below:
+```{r}
+#define explanatory variables
+explanatory = c("Service_Connections", "Fee_Code")
+#plot ORs
+allSmalls.requested.responded %>% 
+  or_plot("cash_reserve_restricted_NA",
+          explanatory, table_text_size=4, title_text_size=14, 
+    plot_opts=list(xlab("OR, 95% CI"), theme(axis.title = element_text(size=12))))
+```
+While data is missing for unrestricted cash reserves, it may be possible to estimate this from other data. This may be easily visualized in a dot plot.
+
+```{r}
+allSmalls.requested.responded %>% 
+  ggplot(aes(x = log10(cash_reserve_unrestricted), y = log10(cash_reserve_total), color = Fee_Code)) + 
+  geom_point() +
+  theme_minimal()
+```
+We can see discrete grouping of cash reserve (total and unrestricted) by fee code with community larges (C1) and disadvantaged community larges have higher cash reserves, while small community (SC) and disadvantaged small communities have lower cash reserves. There also seems to be a clear relationship between these variables, with some highly significant outliers. Independent linear regression models may be used to predict missing data, however more sophisticated methods are likely necessary to reliably predict outliers. 
+
+Since there are many missing data, we cannot simply rely on single models for each variable. It is therefore necessary to perform multiple imputation to preserve our dataset. I will use the mice (which stands for Multivariate Imputation by Chained Equations) package which is developed by Stef van Buuren. The basic steps of multiple imputation are described by Rubin (1976). *Citation: Rubin, Donald B. 1976. “Inference and missing data.” Biometrika 63, no. 3: 581-592.*
 
 # Multiple Imputation
 *The following text is copied, sometimes verbatim, from the [University of Virgina Library] (https://data.library.virginia.edu/getting-started-with-multiple-imputation-in-r/)* 
@@ -199,16 +334,13 @@ Now that we have 3 complete datasets, the next step is to run an ols regression 
 Finally, we pool together the 3 coefficients estimated by the imputed dataset into 1 final regression coefficient, and estimate the variance using the *pool* command. With the assumption that regression coefficients are obtained from a multivariate normal distribution, in order to obtain the final coefficient we just take the mean of 3 values. We calculate the variance of the estimated coefficient by factoring in the within (accounting for differences in predicted values from the dataset regarding each observation) and between (accounting for differences between 3 datasets) imputation variance.
 
 ## Mice Implementation
-First let's start my building an Ordinary Least Squares (OLS) linear regression to predict cash in reserve (total) based on relevant predictors for all systems (e.g. service connections, median 12 month household income, delinquent number of accounts, delinquent amout in dollars, CalEnvrioScreen 3 scores, volunteer status for filling out survey).
+First let's start my building an Ordinary Least Squares (OLS) linear regression to predict cash in reserve (total) based on relevant predictors for all systems (e.g. service connections, median 12 month household income, delinquent number of accounts, delinquent amout in dollars, CalEnvrioScreen 3 scores, volunteer status for filling out survey). We will ignore the volunteer data for now. 
 ```{r}
-#first just use data that was completed (i.e. response = y)
-allSmalls.responded <- allSmalls %>% 
-  filter(responded == "y")
 ## Estimate an OLS Regression
-fitols <- lm(months_before_assist_num ~ Service_Connections + Population + cash_reserve_total + Median_12month_HH_income + Median_rent_pct_income + CES_3.0_Score + delinquent_num_acc + volunteered + delinquent_amount_dollars, data = allSmalls.responded)
+fitols <- lm(months_before_assist_num ~ Service_Connections + Population + cash_reserve_total + Median_12month_HH_income + Median_rent_pct_income + CES_3.0_Score + delinquent_num_acc + volunteered + delinquent_amount_dollars, data = allSmalls.requested.responded)
 summary(fitols)
 ```
-As we can see in the table above, a significant number of observations were deleted due to missingness (58 out of 410). Since this is greater than 14% of the whole dataset, our survey would be limited in power.
+As we can see in the table above, a significant number of observations were deleted due to missingness (80 out of 371). Since this is greater than 14% of the whole dataset, our survey would be limited in power.
 
 Time to impute. First we need to prepare the dataset for imputation. It's best to keep it in it's rawest form, so any categorical factors should be left as so, instead of using the ordinal transformed variable from above. Further, we want to remove variables that have haver than 25% missing values because they may mess up the imputation. It's also important to remove variables that are highly correlated with others so as to stop the imputation working otherwise.
 ```{r}
@@ -218,12 +350,12 @@ sort(p_missing[p_missing > 0], decreasing = TRUE)
 Many of these variables are missing at high rates, such as sub-metered status,and unrestricted cash reserve. I'll remove those. Also, the monetary values are bins and are not "missing" so much as they are just formatted long-wise binary. We'll remove those too.
 ```{r}
 #define sub dataset
-allSmalls.simple <- allSmalls.responded %>% 
-  select(PWSID, Service_Connections, Population, volunteered, Median_12month_HH_income, Median_12month_HH_income, CES_3.0_Score, months_before_assist, cash_reserve_total, delinquent_num_acc, delinquent_amount_dollars, revenue_2020_Total, revenue_2019_Total)
+allSmalls.simple <- allSmalls.requested.responded %>% 
+  select(PWSID, Service_Connections, Population, Median_12month_HH_income, Median_12month_HH_income, CES_3.0_Score, months_before_assist, cash_reserve_total, delinquent_num_acc, delinquent_amount_dollars, revenue_2020_Total, revenue_2019_Total)
 
 #split the other half of the dataset for easy joining
-allSmalls.rest <- allSmalls.responded %>% 
-  select(-Service_Connections, -Population, -volunteered, -Median_12month_HH_income, -Median_12month_HH_income, -CES_3.0_Score, -months_before_assist, -cash_reserve_total, -delinquent_num_acc, -delinquent_amount_dollars, -revenue_2020_Total, -revenue_2019_Total)
+allSmalls.rest <- allSmalls.requested.responded %>% 
+  select(-Service_Connections, -Population, -Median_12month_HH_income, -Median_12month_HH_income, -CES_3.0_Score, -months_before_assist, -cash_reserve_total, -delinquent_num_acc, -delinquent_amount_dollars, -revenue_2020_Total, -revenue_2019_Total)
 #see missing values
 md.pattern(allSmalls.simple)
 ```
@@ -273,7 +405,8 @@ plot(ini)
 Convergence is quite good for some variables (revenue  2020 and 2019 totals,cash reserves), but poor for others. Let's try another imputation process:
 ```{r}
 # With this command, we tell mice to impute the subset data, create 5 datasets, use predM as the predictor matrix and don't print the imputation process. If you would like to see the process, set print as TRUE
-imp2 <- mice(allSmalls.simple, maxit =5, #may want to extend to 40
+imp2 <- mice(allSmalls.simple, 
+             maxit =20, #may want to extend to 40
              predictorMatrix = predM, 
              nnet.MaxNWts = 3000, # increase max neural network weights
              method = "cart", #Classification and regression trees method
@@ -353,10 +486,15 @@ Many of these variables seem to be well-predicted by the mode. The worst seems t
 ```{r}
 densityplot(imp, ~CES_3.0_Score)
 ```
-We can see here that the model biases towards lower scores. 
+We can see here that the model biases towards lower CalEnviroScreen 3.0 scores. 
 ```{r}
 densityplot(imp2, ~months_before_assist)
 ```
+This model seems to overestimate the number of systems that will need immediate assistance. 
+```{r}
+densityplot(imp2, ~Median_12month_HH_income)
+```
+This model has not adequately learned income status.
 
 Let's further compare the default imputation method (passive multiple imputation) with the other method employed (Classification and regression trees method) for CES 3.0 score. 
 ```{r}
@@ -366,22 +504,47 @@ CES_3.0_Score_m <- data.frame(CES_3.0_Score = CES_3.0_Score, method = method)
 #plot histogram
 histogram( ~CES_3.0_Score | method, data = CES_3.0_Score_m, nint = 25)
 ```
+Here we see that passive multiple imputation and the Classification and regression trees method do not seemingly differ in prediction. However, these values were still poorly predicted, so we will not use them further.
 
-
-Now that we are satisfied with our imputed dataset, let's extract the completed data and confirm that there are no additional missing values. 
+Now that we are satisfied with the selected imputed variables for dataset, let's extract the completed data and confirm that there are no additional missing values. 
 ```{r}
 #extract the third imputed data set
-simpleImputed <- complete(imp2) 
+simpleImputed <- complete(imp2) %>% select(-CES_3.0_Score, -Median_12month_HH_income, -months_before_assist, -Service_Connections, -Population)
 #the imputed data can also be extracted in long format.
 #c.long <- complete(imp, "long")  
 md.pattern(simpleImputed)
 ```
+Here we can see that all data is completed.
+
+We can also compare summary statistics for the imputed variables with those in the original dataset.
+```{r}
+simpleImputed %>% 
+  mutate(Grp = "Imputed") %>%
+  bind_rows(mutate(allSmalls.requested.responded, Grp = "Original"))  %>%
+  select(Grp, delinquent_num_acc, delinquent_amount_dollars, revenue_2020_Total, revenue_2019_Total) %>%
+  group_by(Grp) %>% 
+  drop_na() %>% 
+  summarize_all(list(mean = "mean", median = "median"))
+```
+Summary stats can be plotted.
+```{r}
+#join data for plotting
+simpleImputed %>% mutate(Grp = "Imputed") %>%
+  bind_rows(mutate(allSmalls.requested.responded, Grp = "Original"))  %>%
+  select(Grp, delinquent_num_acc, delinquent_amount_dollars, revenue_2020_Total, revenue_2019_Total) %>% 
+  melt() %>% #transforms values and variables to long format
+  ggplot(aes(x = variable, y = log10(value))) +
+  geom_boxplot(aes(fill = Grp))+
+  geom_jitter(aes(color = Grp), alpha = 0.3)
+```
+We can see that imputation has not noticeably changed the summary statistics of these data. We shall now fill in the dataset with these imputed values. 
+
 ```{r join imputed data}
 #join data with imputed values to rest of dataset
 imputedSmalls <- right_join(simpleImputed, allSmalls.rest, by = "PWSID")
 #also split the dataset that has requested but no response data, which we will only use to adjust weights in the next section
 allSmalls.requested.voluntary.rest <- allSmalls.requested.voluntary %>% 
-  select(-Service_Connections, -Population, -volunteered, -Median_12month_HH_income, -Median_12month_HH_income, -CES_3.0_Score, -months_before_assist, -cash_reserve_total, -delinquent_num_acc, -delinquent_amount_dollars, -revenue_2020_Total, -revenue_2019_Total)
+  select(-cash_reserve_total, -delinquent_num_acc, -delinquent_amount_dollars, -revenue_2020_Total, -revenue_2019_Total)
 #join
 imputedSmalls.requested.voluntary <- right_join(simpleImputed, allSmalls.requested.voluntary.rest, by = "PWSID")
 rm(allSmalls.requested.voluntary.rest)
