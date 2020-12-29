@@ -1540,6 +1540,10 @@ imputedSmalls.survey <- cbind(imputedSmalls.survey, weights(ps.dsgn.imputed.volu
 #             select(PWSID,`weights(ps.dsgn.imputed.volunteers)`),
 #           file = "Datasets/fullSurveyWEIGHTS.csv"
 #           )
+#Save to csv
+write.csv(x = imputedSmalls.survey,
+           file = "Datasets/fullSurveyIMPUTED.csv")
+
 ```
 
 
