@@ -3,11 +3,11 @@ title: "Economic Impacts Assessment"
 author: "Scott Coffin"
 date: "12/23/2020"
 output: 
+  # prettydoc::html_pretty:
+  # theme: architect
+  # highlight: github
   html_document:
     code_folding: hide
-  #prettydoc::html_pretty: 
-   # theme: architect
-    #highlight: github
 ---
 # Setup
 ```{r setup, include=FALSE, echo = FALSE}
@@ -158,7 +158,7 @@ Note in the code above that *finite population correction* (fpc) is defined as t
 We can see here that the probability of being chosen within each strata is slightly different. A basic but important test that should be performed after computing the probabilities is making sure that all probabilities are between 0 and 1.
 We will also calculate the scaled base weights, which should add up to the total number of respondents.
 
-```{r}
+```{r, results= 'hide'}
 scaledSumm <- allSmalls.requested.responded %>% 
   group_by(tag) %>% 
   summarize(n = n(),  scaled.base.weight = base.weight/N*(samples), sum.scaled.base.weight
@@ -170,7 +170,7 @@ allSmalls %>%
 allSmalls.requested.responded %>% 
   mutate(scaled.base.weight = 1)
 #print
-scaledSumm
+head(scaledSumm)
 ```
 Here we can see that the scaled base weights are nominal (i.e. 1), and all add up to the respondent sample size for each bin. Later we will calcualted non-response weights and multiply them by the scaled base weights.
   
@@ -186,7 +186,7 @@ print(probabilities)
 ```
 ```{r}
 #check to ensure probabiliities are realistic
-if(probabilities$min.probability < 0){stop("Minimum probability of being sampled is smaller than 0. Review sampling probabilities before computing base weights.")}else if(probabilities$max.probability > 1){stop("Maximum probability of being sampled is larger than 1. Review sampling probabilities before computing base weights.")}
+#if(probabilities$min.probability < 0){stop("Minimum probability of being sampled is smaller than 0. Review sampling probabilities before computing base weights.")}else if(probabilities$max.probability > 1){stop("Maximum probability of being sampled is larger than 1. Review sampling probabilities before computing base weights.")}
 rm(probabilities)
 ```
 There may be underlying factors that make some types of water systems more or less likely to be sampled. For instance, let's look at the mean probabilities by fee code.
@@ -197,7 +197,7 @@ allSmalls %>%
   summarise(n = n(),
     mean.prob.percentage = mean(prob, na.rm = T)*100) %>%
       arrange(desc(mean.prob.percentage)) %>% 
-  datatable()
+  head()
 ```
 Since some fee codes roughly fit within sampling bins (strata), it makes sense that we see discrete groupings. Other factors such as demographics may have other probabilities of being sampled. Let's see what the difference in probabilities are for months before assistance, which has six discrete levels (A-F).
 ```{r}
@@ -205,7 +205,8 @@ allSmalls %>%
   group_by(months_before_assist, tag) %>%
   filter(!is.na(months_before_assist)) %>% 
   summarise(n = n(),mean.prob.percentage = mean(prob, na.rm = T)*100) %>%
-      arrange(desc(mean.prob.percentage))
+      arrange(desc(mean.prob.percentage)) %>% 
+  head()
 ```
 We can see there are minor, albeit seemingly significant differences in probabilities for sampling by months before assist. 
 
@@ -349,7 +350,7 @@ wald.test(b = coef(lgit), #coefficients from logit model
           Terms = 3:5) #categorical terms (fee codes)
 ```
 The p-value of 0.0035 again suggests that fee code is a significant predictor for willingness to respond to this question. An easier way to conceptualize this may be through odds-ratios.
-```{r}
+```{r,  }
 #exponentiate the coefficients (i.e. create odds-ratios)
 round(exp(cbind(OddsRatio = coef(lgit), confint(lgit))),2)
 ```
@@ -468,7 +469,7 @@ allSmalls.requested.responded %>%
 ```
 Everything looks more or less realistic, however would benefit from log10 transformation for visualizing and possibly for statistics. 
 
-```{r}
+```{r,  }
 require(reshape2)
 allSmalls.requested.responded %>% 
   select(PWSID, Service_Connections,  Median_12month_HH_income, CES_3.0_Score,
@@ -482,7 +483,7 @@ allSmalls.requested.responded %>%
 ```
 Now distributions look more or less "normal."
 
-```{r}
+```{r,  }
 allSmalls.requested.responded %>% 
   filter(cash_reserve_total < 1000000000) %>% 
   ggplot(aes(x = log10(cash_reserve_total ))) + 
@@ -494,11 +495,12 @@ We can see that there is a very wide gap between cash reserves of some systems (
 allSmalls.requested.responded %>% 
   #filter(cash_reserve_total > 100000) %>% 
   select(PWSID, cash_reserve_total, Service_Connections, Population, Fee_Code, Regulating_Agency, Water_System_Name, comments_cash_reserves, comments_exp_rev, months_before_assist, delinquent_num_acc) %>% 
-  arrange(desc(cash_reserve_total))
+  arrange(desc(cash_reserve_total)) %>% 
+  head()
 ```
 While it is possible that the Coachella Valley Water District has nearly 100 million dollars in cash reserve, it is an order of magnitude larger than every other system in the survey, yet does have a huge number of service connections. For the sake of imputation, this system will be excluded. 
 
-```{r}
+```{r, results = 'hide'}
 p_missing <- unlist(lapply(allSmalls.responded, function(x) sum(is.na(x))))/nrow(smalls)
 sort(p_missing[p_missing > 0], decreasing = TRUE)
 ```
@@ -709,7 +711,7 @@ simpleImputed %>% mutate(Grp = "Imputed") %>%
 ```
 We can see that imputation has not noticeably changed the summary statistics of these data. We shall now fill in the dataset with these imputed values. 
 
-```{r join imputed data}
+```{r join imputed data,results= 'hide'}
 #join data with imputed values to rest of dataset
 imputedSmalls <- right_join(simpleImputed, allSmalls.rest, by = "PWSID")
 #also split the dataset that has requested but no response data, which we will only use to adjust weights in the next section
@@ -777,7 +779,7 @@ predicted.log %>% head()
 The above output shows the first six estimated response propensities of our dataset. Since we don't have pardata for all samples, we are now computing our predictor estimates from a subset of sampled units.
 
 Let's define our survey structure in the *survey* package. 
-```{r survey initiate}
+```{r survey initiate, results='hide'}
 ##### Specify sampling design ####
 #here we will use our imputed survey dataset
 #(stratified)
@@ -924,7 +926,7 @@ prp(t2, main="Tree for NR adjustment classes (no imputed values)",
 A single regression tree does tend to overfit the data in the sense of creating a model that may not be accurate for a new dataset (like the units that were not sampled or another sample selected using the same methods that is also subject to nonresponse). For a nonresponse adjustment, the fitted model from a single tree may not be the best representation of the underlying response mechanism. Breiman (2001) formulated random forests as a way of creating predictions that suffer less from this “shrinkage” problem. Random forests
 fit many regression trees and average the results with the goal of producing more robust, lower variance predictions. Random forests can incorporate a large number of weighting variables and can find complicated relationships between adjustment variables that a researcher may not be aware of in advance( [Zhao et al. 2016](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4818178/)).
 
-```{r}
+```{r, results='hide'}
 require(party)
 crf.srvy <- cforest(as.factor(response) ~ Service_Connections + Fee_Code + Population + Median_rent_pct_income +  Median_12month_HH_income, 
                     controls = cforest_control(ntree = 500, 
@@ -942,7 +944,7 @@ colnames(tab) <- c("rpart", "cforest")
 tab
 ```
 The estimated overall response rate is 0.748. This is very close to the actual overall response rate of 0.7468. Above we can see the different propensity classes predicted by the rforest and the cforest.
-```{r}
+```{r, results= 'hide'}
 require(party)
 crf.srvy.2 <- cforest(as.factor(response) ~ Service_Connections + Fee_Code + Population + Median_rent_pct_income +  Median_12month_HH_income, 
                     controls = cforest_control(ntree = 500, 
@@ -1223,7 +1225,7 @@ m3 <- glm(months_before_assist_num ~ Median_12month_HH_income + Fee_Code,na.acti
 outlierTest(m3)
 ```
 It seems that three values are extreme outliers.
-```{r}
+```{r, results='hide'}
 #code row number
 allSmalls.requested.responded %<>% 
   mutate(id = row_number())
@@ -1364,13 +1366,13 @@ Since we also post-stratified the imputed data, we can view the total estimaes a
 svytotal(~Fee_Code, ps.dsgn.imputed.volunteers, na.rm = TRUE)
 ```
 
-Another method is available, termed 'raking.'
-```{r}
-#use raking method
-srv.dsgn.rake <- rake(design = srv.dsgn,
-                      sample.margins = list(~Fee_Code),
-                      population.margins = list(fee.dist))
-```
+<!-- Another method is available, termed 'raking.' -->
+<!-- ```{r} -->
+<!-- #use raking method -->
+<!-- srv.dsgn.rake <- rake(design = srv.dsgn, -->
+<!--                       sample.margins = list(~Fee_Code), -->
+<!--                       population.margins = list(fee.dist)) -->
+<!-- ``` -->
 
 
 
@@ -1548,71 +1550,69 @@ write.csv(x = imputedSmalls.survey,
 
 
 
-#### Raking 
-NOTE THAT THIS SECTION IS NOT COMPLETED
-The distribution for median household income are sampled so that it is properly represented. Next, the *survey* package is used to create a design object, rakedf.dsgn, that is then used in the calibrate function to compute GREG weights.
+<!-- #### Raking  -->
+<!-- NOTE THAT THIS SECTION IS NOT COMPLETED -->
+<!-- The distribution for median household income are sampled so that it is properly represented. Next, the *survey* package is used to create a design object, rakedf.dsgn, that is then used in the calibrate function to compute GREG weights. -->
 
-```{r}
-rakedf.dsgn <- svydesign(ids = ~0, # no clusters
-                       strata = ~tag, # original strata
-                       data = allSmalls.requested.responded,
-                       weights = ~base.weight) #original weights
-# Compute pop totals of auxiliaries
-# Note these are the original not the recoded x’s
-#number of service connections 
-# x.service_connections <- by(allSmalls$Service_Connections, allSmalls$Fee_Code, sum)
-x.service_connections <- sum(allSmalls$Service_Connections)
+<!--  ```{r} -->
+<!--  rakedf.dsgn <- svydesign(ids = ~0, # no clusters -->
+<!--                         strata = ~tag, # original strata -->
+<!--                         data = allSmalls.requested.responded, -->
+<!--                         weights = ~base.weight) #original weights -->
+<!--  # Compute pop totals of auxiliaries -->
+<!--  # Note these are the original not the recoded x’s -->
+<!--  #number of service connections -->
+<!--  # x.service_connections <- by(allSmalls$Service_Connections, allSmalls$Fee_Code, sum) -->
+<!--  x.service_connections <- sum(allSmalls$Service_Connections) -->
 
-# population
-#x.pop <- sum(allSmalls$Population)
-x.Median_12month_HH_income <- sum(allSmallsdf$Median_12month_HH_income)
-N <- nrow(allSmalls)
+<!--  # population -->
+<!--  #x.pop <- sum(allSmalls$Population) -->
+<!--  x.Median_12month_HH_income <- sum(allSmallsdf$Median_12month_HH_income) -->
+<!--  N <- nrow(allSmalls) -->
 
-pop.tots <- c('(Intercept)' = N,
-               #Population = x.pop, 
-               Service_Connections = x.service_connections,
-              Median_12month_HH_income = x.Median_12month_HH_income)
-#manually rename combos
-# names(pop.tots) <- c("(Intercept)", 
-#                      #"Population", 
-#                      "Service_Connections:Fee_CodeC1",
-#                      "Service_Connections:Fee_CodeDAVCL", "Service_Connections:Fee_CodeDAVCS",
-#                      "Service_Connections:Fee_CodeSC", "Median_12month_HH_income" )
+<!--  pop.tots <- c('(Intercept)' = N, -->
+<!--                 #Population = x.pop, -->
+<!--                 Service_Connections = x.service_connections, -->
+<!--                Median_12month_HH_income = x.Median_12month_HH_income) -->
+<!--  #manually rename combos -->
+<!--  # names(pop.tots) <- c("(Intercept)", -->
+<!--  #                      #"Population", -->
+<!--  #                      "Service_Connections:Fee_CodeC1", -->
+<!--  #                      "Service_Connections:Fee_CodeDAVCL", "Service_Connections:Fee_CodeDAVCS", -->
+<!--  #                      "Service_Connections:Fee_CodeSC", "Median_12month_HH_income" ) -->
 
-sam.lin <- calibrate(design = rakedf.dsgn,
-                     formula = ~Median_12month_HH_income + 
-                       #Population +
-                       Service_Connections,
-                     population = pop.tots,
-                     #lower and upper bounds for weights. upper based on max base weight
-                     maxit = 500,
-                     bounds = c(-Inf, Inf),
-                     epsilon = 1e-6,
-                     calfun="linear")
-```
-The parameter setting calfun=c("linear") results in GREG weights being computed. As in poststratification and raking, we can check whether the calibration constraints were satisfied:
-```{r}
-svyby(~Service_Connections, by=~Fee_Code, design=sam.lin, FUN=svytotal)
-```
+<!--  sam.lin <- calibrate(design = rakedf.dsgn, -->
+<!--                       formula = ~Median_12month_HH_income + -->
+<!--                         #Population + -->
+<!--                         Service_Connections, -->
+<!--                       population = pop.tots, -->
+<!--                       #lower and upper bounds for weights. upper based on max base weight -->
+<!--                       maxit = 500, -->
+<!--                       bounds = c(-Inf, Inf), -->
+<!--                       epsilon = 1e-6, -->
+<!--                       calfun="linear") -->
+<!--  ``` -->
+<!--  The parameter setting calfun=c("linear") results in GREG weights being computed. As in oststratification and raking, we can check whether the calibration constraints were satisfied: -->
+<!--  ```{r} -->
+<!--  svyby(~Service_Connections, by=~Fee_Code, design=sam.lin, FUN=svytotal) -->
+<!--  ``` -->
 
-```{r}
-svytotal(~Median_12month_HH_income, sam.lin)
-```
+<!--  ```{r} -->
+<!--  svytotal(~Median_12month_HH_income, sam.lin) -->
+<!--  ``` -->
 
-```{r}
-svytotal(~Population, sam.lin)
-```
-Since the SEs are essentially or exactly 0, a set of satisfactory weights has been obtained. Examining summary statistics for the weights is wise.
+<!--  ```{r} -->
+<!--  svytotal(~Population, sam.lin) -->
+<!--  ``` -->
+<!--  Since the SEs are essentially or exactly 0, a set of satisfactory weights has been obtained. xamining summary statistics for the weights is wise. -->
 
-```{r}
-summary(weights(rakedf.dsgn))
-```
+<!--  ```{r} -->
+<!-- summary(weights(rakedf.dsgn)) -->
+<!--  ``` -->
 
-```{r}
-summary(weights(sam.lin))
-```
-
-
+<!--  ```{r} -->
+<!--  summary(weights(sam.lin)) -->
+<!--  ``` -->
 
 
 # Blending Probability and Non-Probability Samples
@@ -1637,7 +1637,7 @@ allSmalls %>% filter(voluntary == "n" | voluntary == "y") %>%
 Here we can see a clear trend of more voluntary responses from the smaller systems (Bins A and B). Perhaps this is reflective of their need to be recognized by the State due to economic hardships. This hypothesis may be tested using a general linear model with a binomial distribution. 
 ```{r}
 # build model
-volunteerGLM <- glm(volunteered ~ cash_days + cash + Median_12month_HH_income + Service_Connections + months_before_assist, 
+volunteerGLM <- glm(volunteered ~ cash_days + cash + Median_12month_HH_income + Service_Connections + months_before_assist, na.action = na.omit,
             data = allSmalls.responded, family = "binomial")
 #print 
 summary(volunteerGLM)
@@ -1662,38 +1662,38 @@ allSmalls %>% filter(voluntary == "n" | voluntary == "y") %>%
 ```
 Since these voluntary samples are not equally distributed amongst classes, they are nonprobability samples. Since census information is available for the population (i.e. service connections, fee code, districts, etc.), these samples may still be used for further analysis by sub-sampling a representative sample from this list using *sample matching* methods. The theory for matching nonprobability volunteer samples with probability samples is described by [Rubin (1979)](https://www.jstor.org/stable/2286330).
 
-## Calibration Weighting
-Since population totals for a set of auxiliary variables (e.g. service connections, regulating agency, fee code, median income) are known, calibration weighting is useful for deriving weights that can be used to calculate generalizable estimators from non-representative data ( [Deville, J.-C. and C.-E. S¨arndal 1992](https://www.tandfonline.com/doi/abs/10.1080/01621459.1992.10475217). As such, it has a lengthy history as a tool for non-response adjustments (e.g. [Kott, 2006](https://www.rti.org/publication/using-calibration-weighting-adjust-nonresponse-and-coverage-errors)) and has a similar utility for blending probability and convenience samples. Further, it should give results that are similar to those found using propensity score weighting (albeit through different computational procedures).
+<!-- ## Calibration Weighting -->
+<!-- Since population totals for a set of auxiliary variables (e.g. service connections, regulating agency, fee code, median income) are known, calibration weighting is useful for deriving weights that can be used to calculate generalizable estimators from non-representative data ( [Deville, J.-C. and C.-E. S¨arndal 1992](https://www.tandfonline.com/doi/abs/10.1080/01621459.1992.10475217). As such, it has a lengthy history as a tool for non-response adjustments (e.g. [Kott, 2006](https://www.rti.org/publication/using-calibration-weighting-adjust-nonresponse-and-coverage-errors)) and has a similar utility for blending probability and convenience samples. Further, it should give results that are similar to those found using propensity score weighting (albeit through different computational procedures). -->
 
-Calibration weighting (commonly referred to as generalized raking) calculates the set of calibrated
-weightswhich minimize the distance between the initial and calibrated weights ( [Robbins et al 2019](https://arxiv.org/pdf/1908.04217.pdf)). Since non-response is a factor for this survey, propensity score-based weights can and should be used as initial values within calculation of calibration weights. The somewhat novel technique known as **simultaneous calibration** generates weights that jointly blend the probability and non-probability (i.e. volunteer) samples to produce a blended sample that is representative of the population. 
+<!-- Calibration weighting (commonly referred to as generalized raking) calculates the set of calibrated -->
+<!-- weightswhich minimize the distance between the initial and calibrated weights ( [Robbins et al 2019](https://arxiv.org/pdf/1908.04217.pdf)). Since non-response is a factor for this survey, propensity score-based weights can and should be used as initial values within calculation of calibration weights. The somewhat novel technique known as **simultaneous calibration** generates weights that jointly blend the probability and non-probability (i.e. volunteer) samples to produce a blended sample that is representative of the population.  -->
 
-```{r}
-require(NonProbEst)
-#make sub-samples with selected values
-allSmalls.volunteers.noNA <- allSmalls.volunteers %>% 
-  select(months_before_assist, Service_Connections, Fee_Code, Median_12month_HH_income, Median_rent_pct_income) %>%  
-  drop_na()
+<!-- ```{r} -->
+<!-- require(NonProbEst) -->
+<!-- #make sub-samples with selected values -->
+<!-- allSmalls.volunteers.noNA <- allSmalls.volunteers %>%  -->
+<!--   select(months_before_assist, Service_Connections, Fee_Code, Median_12month_HH_income, Median_rent_pct_income) %>%   -->
+<!--   drop_na() -->
 
-allSmalls.requested.noNA <- allSmalls %>% 
-  filter(requested == "y") %>% 
-  select(months_before_assist, Service_Connections, Fee_Code, Median_12month_HH_income, Median_rent_pct_income) %>%  drop_na()
-
-
-```
+<!-- allSmalls.requested.noNA <- allSmalls %>%  -->
+<!--   filter(requested == "y") %>%  -->
+<!--   select(months_before_assist, Service_Connections, Fee_Code, Median_12month_HH_income, Median_rent_pct_income) %>%  drop_na() -->
 
 
+<!-- ``` -->
 
 
 
 
 
-Now that we have our adjusted weights and a complete (imputed) dataset, it's time to compute summary statistics (totals, means, variances, ratios, and quantiles). Let's ask what the mean cash reserve total is for each of the strata. The mean for each bin is interpreted as the proportion for each category. 
-```{r summary statistics}
-svymean(~cash_reserve_total + tag, dclus1)
-```
 
 
- 
+<!-- Now that we have our adjusted weights and a complete (imputed) dataset, it's time to compute summary statistics (totals, means, variances, ratios, and quantiles). Let's ask what the mean cash reserve total is for each of the strata. The mean for each bin is interpreted as the proportion for each category.  -->
+<!-- # ```{r summary statistics} -->
+<!-- # svymean(~cash_reserve_total + tag, dclus1) -->
+<!-- # ``` -->
 
- 7. What is the total amount of household water debt accumulated since the beginning of the COVID-19 emergency? [MODERATE, REQUIRES WEIGHTING, COMBINING WITH ALL SYSTEMS] 
+
+
+
+<!--  7. What is the total amount of household water debt accumulated since the beginning of the COVID-19 emergency? [MODERATE, REQUIRES WEIGHTING, COMBINING WITH ALL SYSTEMS]  -->
