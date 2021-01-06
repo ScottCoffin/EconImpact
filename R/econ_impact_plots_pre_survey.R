@@ -26,7 +26,7 @@ econ1 %>%
 
 ## filter data ##
 econ3 <- econ1 %>% 
- filter(Service.Connections <10000) %>% #filter above 2 because there are many
+ filter(Service.Connections >10000) %>% #filter above 2 because there are many
   filter(Fee.Code !="WH") %>%  #filter out wholesalers 
   filter(Fee.Code !="N1") %>% #transient non-community water systems
   filter(Fee.Code !="N2") %>%  #transient non-community water systems (handwash exemption)
