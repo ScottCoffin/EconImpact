@@ -1,0 +1,111 @@
+---
+title: "COVID Financial Impacts and Household Debt Survey"
+author: "Marielle Pinheiro"
+#date: "1/7/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(readxl)
+library(reticulate)
+```
+
+## Background and Objectives
+
+- Why did we administer the survey?
+- How did we administer the survey?
+- What questions were in the survey and why?
+
+### Survey response rate
+
+The original surveys for the small/medium systems (i.e. those with less than 10,000 service connections) were administered by DDW staff, while the large system (>10,000 connections) surveys were emailed to the systems' administrative contacts. Some of the submitted surveys contained results for multiple systems, since the managing entity was unable to provide a per-system breakdown of agency finances and customer debt.
+
+406 small/medium system surveys responses were provided; 7 of the submitted surveys contained data for multiple systems. Data was collected for 383 systems that were in the original sample list of 510 systems, with the addition of 45 systems not within the original sample. This results in a total of 428 small/medium systems in the dataset, with a corresponding sample population of 4 million people. 
+
+131 large system surveys were returned; 3 of the submitted surveys contained data for multiple systems. Data was collected for 135 systems in the original sample list of 150 systems, with the addition of 16 systems not within the original sample. This results in a total of 151 systems that responded to the large system survey, with a corresponding sample population of 24.2 million people. These numbers come with a caveat; 10 of the 16 non-sample systems have less than 10,000 service connections, since they were included in large system survey responses that contained results for multiple systems.
+
+## Small/Medium System Survey Results
+
+```{python risk_calcs}
+import pandas as pd
+import numpy as np
+#Read in the survey data
+ds='C:/Users/mpinheiro/Documents/GitHub/EconImpact/Datasets/combined_results_w_pop.xlsx'
+#Risk scores
+lq=pd.read_excel(ds,'Large System Financial Qs')
+sq=pd.read_excel(ds,'Small System Financial Qs')
+zq=pd.read_excel(ds,'Combined Zip Table')
+
+conn_ref=pd.read_excel(ds,'Population and Connections')
+conn_ref.loc[:,'Bin']=pd.cut(conn_ref['Service Connections'],bins=[0,1045,3383,6458,10000,1000000000],
+                            labels=['A','B','C','D','Large'])
+                            
+                            
+ndays=30+31+30+31+31+30+31
+dat=sq[['PWSID','sys_name','months_before_assist','expense_2020_Total','revenue_2020_Total','cash_reserve_restricted','cash_reserve_unrestricted','cash_reserve_total','Population','Service Connections']]
+
+q5_store=pd.DataFrame()
+for i,r in dat.iterrows():
+    p=r['PWSID']
+    cash=r['cash_reserve_total']
+    cash_u=r['cash_reserve_unrestricted']
+    expense=r['expense_2020_Total']
+    rev=r['revenue_2020_Total']
+    res=r['months_before_assist']
+    
+    if (np.isnan(cash_u)&(np.isnan(r['cash_reserve_restricted']))):
+        #print(cash,r['cash_reserve_restricted'],cash_u)
+        cash_u=cash
+        #print(cash_u)
+
+    if len(p)>9:
+        results=p.split(',')
+        res2=[x.strip() for x in results]
+        #look up the number of connections
+        conns=conn_ref[conn_ref['PWSID'].isin(res2)]
+    else:
+        conns=conn_ref[conn_ref['PWSID']==p]
+
+    conns.loc[:,'cash']=cash
+    conns.loc[:,'cash_u']=cash_u
+    conns.loc[:,'cash_u_days']=cash_u/(expense/ndays)
+    conns.loc[:,'cash_days']=cash/(expense/ndays)
+    conns.loc[:,'op_ratio']=rev/expense
+    conns.loc[:,'months']=res
+    q5_store=q5_store.append(conns,ignore_index=True)
+q5_store=q5_store.drop_duplicates()
+
+```
+
+- Systems in financial peril (sample and statewide estimates?)
+  - 90/180 days
+  - Potentially impacted population estimate
+  - Follow up with survey respondents
+  - correlation with median household income
+  - reserve levels, deferred maintenance?
+  - How did we ensure statistical validity?
+  
+  
+```{r}
+py$q5_store
+
+```
+## Household Debt Results
+
+- Total statewide household debt estimate
+  - Number of households with debt and median debt level plus distribution
+  - geographic breakdown (map?): definitely want to highlight high debt concentration in LA
+- Zip code level debt findings
+  - Areas where households have high level of debt
+  - Areas with large numbers of indebted households
+  - Noteworthy demographic correlations
+- Other findings
+  - Water service debt vs other charges
+  - Billing system limitations (inability to look at prior billing cycles)
+  
+## Next Steps
+
+- Uses of data
+- Technical call
+- continue outreach to vulnerable systems
