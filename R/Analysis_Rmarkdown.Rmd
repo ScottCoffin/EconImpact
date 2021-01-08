@@ -1229,7 +1229,12 @@ srv.mean.imputed.volunteers <- setNames(cbind(rownames(srv.mean.imputed.voluntee
 
 
 #join tables
-left_join(left_join(left_join(left_join(srv.mean,post.strat.mean, by = "variable"), srv.mean.unadjusted),srv.mean.unweighted), srv.mean.imputed.volunteers)
+smallsSurveySummary <- left_join(left_join(left_join(left_join(srv.mean,post.strat.mean, by = "variable"), srv.mean.unadjusted),srv.mean.unweighted), srv.mean.imputed.volunteers)
+#save
+write.csv(smallsSurveySummary,
+          file = "R/output/smallsSurveySummary.csv")
+#print
+smallsSurveySummary
 ```
 We can see that adjusted for non-response and post-stratifying by fee code has increased the standard error and the mean relative to no adjustment for most variables. 
 
@@ -1322,6 +1327,162 @@ grid.arrange(p1, p2, p3)
 ```
 Our survey has now been weighted to adequately represent fee code distributions.
 
+This is repeated below for totals.
+```{r totals summary for smalls}
+#calcualte unweighted totals
+srv.total.unweighted <- svytotal(~cash_reserve_total + cash_reserve_restricted + cash_reserve_unrestricted +
+                         months_before_assist_num + delinquent_num_acc + `Total number of delinquent residential accounts`+
+                           delinquent_amount_dollars, 
+                         srv.dsgn.unweighted, na.rm = TRUE)
+srv.total.unweighted <- data.frame(srv.total.unweighted)
+#reassign names
+srv.total.unweighted <- setNames(cbind(rownames(srv.total.unweighted), srv.total.unweighted, row.names = NULL),
+         c("variable", "srv.total.unweighted", "srv.SE.unweighted")) 
+
+#calcualte un-adjusted weights totals
+srv.total.unadjusted <- svytotal(~cash_reserve_total + cash_reserve_restricted + cash_reserve_unrestricted +
+                         months_before_assist_num + delinquent_num_acc + `Total number of delinquent residential accounts`+
+                           delinquent_amount_dollars, 
+                         srv.dsgn.unadjusted, na.rm = TRUE)
+srv.total.unadjusted <- data.frame(srv.total.unadjusted)
+#reassign names
+srv.total.unadjusted <- setNames(cbind(rownames(srv.total.unadjusted), srv.total.unadjusted, row.names = NULL),
+         c("variable", "srv.total.unadjusted", "srv.SE.unadjusted")) 
+
+#calcualte survey totals
+srv.total <- svytotal(~cash_reserve_total + cash_reserve_restricted + cash_reserve_unrestricted +
+                         months_before_assist_num + delinquent_num_acc + `Total number of delinquent residential accounts`+
+                           delinquent_amount_dollars, 
+                         srv.dsgn, na.rm = TRUE)
+srv.total <- data.frame(srv.total)
+#reassign names
+srv.total <- setNames(cbind(rownames(srv.total), srv.total, row.names = NULL),
+         c("variable", "srv.total", "srv.SE")) 
+#calcualte post-stratification totals
+post.strat.total  <-  svytotal(~cash_reserve_total + cash_reserve_restricted +
+                               cash_reserve_unrestricted +
+                         months_before_assist_num + delinquent_num_acc + `Total number of delinquent residential accounts`+
+                           delinquent_amount_dollars,
+                         ps.dsgn, na.rm = TRUE)
+
+post.strat.total <- data.frame(post.strat.total)
+post.strat.total <- setNames(cbind(rownames(post.strat.total), post.strat.total, row.names = NULL),
+         c("variable", "post.strat.total", "post.strate.SE"))
+
+#calcualte post-stratified totals for IMPUTED data
+srv.total.imputed.volunteers <- svytotal(~cash_reserve_total + cash_reserve_restricted + cash_reserve_unrestricted
+                                       +
+                         months_before_assist_num + delinquent_num_acc + `Total number of delinquent residential accounts`+
+                           delinquent_amount_dollars, 
+                         srv.dsgn.imputed.volunteers, na.rm = TRUE)
+srv.total.imputed.volunteers <- data.frame(srv.total.imputed.volunteers)
+#reassign names
+srv.total.imputed.volunteers <- setNames(cbind(rownames(srv.total.imputed.volunteers), srv.total.imputed.volunteers, row.names = NULL),
+         c("variable", "srv.total.imputed.volunteers", "srv.SE.imputed.volunteers")) 
+
+
+#join tables
+smallsSurveySummaryTotal <- left_join(left_join(left_join(left_join(srv.total,post.strat.total, by = "variable"), srv.total.unadjusted),srv.total.unweighted), srv.total.imputed.volunteers)
+#save
+write.csv(smallsSurveySummaryTotal,
+          file = "R/output/smallsSurveySummaryTotal.csv")
+#print
+smallsSurveySummaryTotal
+```
+Just for debt.
+```{r totals summary for smalls}
+#calcualte unweighted total debt
+srv.total.unweighted.debt <- as.data.frame(svytotal(~delinquent_amount_dollars, 
+                         srv.dsgn.unweighted, na.rm = TRUE))
+#reassign names
+srv.total.unweighted.debt <- setNames(cbind(rownames(srv.total.unweighted.debt), srv.total.unweighted.debt, row.names = NULL),
+         c("variable", "srv.total.unweighted", "srv.SE.unweighted")) 
+
+#calcualte un-adjusted weights total debt
+srv.total.unadjusted.debt <- as.data.frame(svytotal(~delinquent_amount_dollars, 
+                         srv.dsgn.unadjusted, na.rm = TRUE))
+#reassign names
+srv.total.unadjusted.debt <- setNames(cbind(rownames(srv.total.unadjusted.debt), srv.total.unadjusted.debt, row.names = NULL),
+         c("variable", "srv.total.unadjusted", "srv.SE.unadjusted")) 
+
+#calcualte survey total debt
+srv.total.debt <- as.data.frame(svytotal(~delinquent_amount_dollars, 
+                         srv.dsgn, na.rm = TRUE))
+#reassign names
+srv.total.debt <- setNames(cbind(rownames(srv.total.debt), srv.total.debt, row.names = NULL),
+         c("variable", "srv.total", "srv.SE")) 
+#calcualte post-stratification totals
+post.strat.total.debt  <-  as.data.frame(svytotal(~delinquent_amount_dollars,
+                         ps.dsgn, na.rm = TRUE))
+
+post.strat.total.debt <- setNames(cbind(rownames(post.strat.total.debt), post.strat.total.debt, row.names = NULL),
+         c("variable", "post.strat.total", "post.strate.SE"))
+
+#calcualte post-stratified totals for IMPUTED data
+srv.total.imputed.volunteers.debt <- as.data.frame(svytotal(~delinquent_amount_dollars, 
+                         srv.dsgn.imputed.volunteers, na.rm = TRUE))
+
+#reassign names
+srv.total.imputed.volunteers.debt <- setNames(cbind(rownames(srv.total.imputed.volunteers.debt), srv.total.imputed.volunteers.debt, row.names = NULL),
+         c("variable", "srv.total.imputed.volunteers", "srv.SE.imputed.volunteers")) 
+
+
+#join tables
+smallsSurveySummaryTotalDebt <- left_join(left_join(left_join(left_join(srv.total.debt,post.strat.total.debt, by = "variable"), srv.total.unadjusted.debt),srv.total.unweighted.debt), srv.total.imputed.volunteers.debt)
+#save
+write.csv(smallsSurveySummaryTotalDebt,
+          file = "R/output/smallsSurveySummaryTotalDebt.csv")
+#print
+smallsSurveySummaryTotalDebt
+```
+
+Just for delinquent number of accouunts
+```{r totals summary for smalls}
+#calcualte unweighted total accounts
+srv.total.unweighted.accounts <- as.data.frame(svytotal(~`Total number of delinquent residential accounts`, 
+                         srv.dsgn.unweighted, na.rm = TRUE))
+#reassign names
+srv.total.unweighted.accounts <- setNames(cbind(rownames(srv.total.unweighted.accounts), srv.total.unweighted.accounts, row.names = NULL),
+         c("variable", "srv.total.unweighted", "srv.SE.unweighted")) 
+
+#calcualte un-adjusted weights total accounts
+srv.total.unadjusted.accounts <- as.data.frame(svytotal(~`Total number of delinquent residential accounts`, 
+                         srv.dsgn.unadjusted, na.rm = TRUE))
+#reassign names
+srv.total.unadjusted.accounts <- setNames(cbind(rownames(srv.total.unadjusted.accounts), srv.total.unadjusted.accounts, row.names = NULL),
+         c("variable", "srv.total.unadjusted", "srv.SE.unadjusted")) 
+
+#calcualte survey total accounts
+srv.total.accounts <- as.data.frame(svytotal(~`Total number of delinquent residential accounts`, 
+                         srv.dsgn, na.rm = TRUE))
+#reassign names
+srv.total.accounts <- setNames(cbind(rownames(srv.total.accounts), srv.total.accounts, row.names = NULL),
+         c("variable", "srv.total", "srv.SE")) 
+#calcualte post-stratification totals
+post.strat.total.accounts  <-  as.data.frame(svytotal(~`Total number of delinquent residential accounts`,
+                         ps.dsgn, na.rm = TRUE))
+
+post.strat.total.accounts <- setNames(cbind(rownames(post.strat.total.accounts), post.strat.total.accounts, row.names = NULL),
+         c("variable", "post.strat.total", "post.strate.SE"))
+
+#calcualte post-stratified totals for IMPUTED data
+srv.total.imputed.volunteers.accounts <- as.data.frame(svytotal(~`Total number of delinquent residential accounts`, 
+                         srv.dsgn.imputed.volunteers, na.rm = TRUE))
+
+#reassign names
+srv.total.imputed.volunteers.accounts <- setNames(cbind(rownames(srv.total.imputed.volunteers.accounts), srv.total.imputed.volunteers.accounts, row.names = NULL),
+         c("variable", "srv.total.imputed.volunteers", "srv.SE.imputed.volunteers")) 
+
+
+#join tables
+smallsSurveySummaryTotalaccounts <- left_join(left_join(left_join(left_join(srv.total.accounts,post.strat.total.accounts, by = "variable"), srv.total.unadjusted.accounts),srv.total.unweighted.accounts), srv.total.imputed.volunteers.accounts)
+#save
+write.csv(smallsSurveySummaryTotalaccounts,
+          file = "R/output/smallsSurveySummaryTotalaccounts.csv")
+#print
+smallsSurveySummaryTotalaccounts
+```
+
 Now that we have our adjusted weights, let's extract them and bind to the dataframes.
 ```{r}
 #bind post-stratified weights to all smalls (no volunteers)
@@ -1336,10 +1497,10 @@ imputedSmalls.survey <- cbind(imputedSmalls.survey, weights(ps.dsgn.imputed.volu
 #            )
 
 #Save to csv
-# write.csv(x = imputedSmalls.survey %>% 
-#             select(PWSID,`weights(ps.dsgn.imputed.volunteers)`),
-#           file = "Datasets/fullSurveyWEIGHTS.csv"
-#           )
+ write.csv(x = imputedSmalls.survey %>% 
+             select(PWSID,`weights(ps.dsgn.imputed.volunteers)`),
+           file = "Datasets/fullSurveyWEIGHTS.csv"
+           )
 #Save to csv
 write.csv(x = imputedSmalls.survey,
            file = "Datasets/fullSurveyIMPUTED.csv")
@@ -1416,13 +1577,13 @@ require(survey)
 larges <- allLarges %>% 
   filter(responded == "y")
 #build survey design with no weights
-srv.dsgn.unweighted <- svydesign(ids = ~0,
+srv.dsgn.unweighted.larges <- svydesign(ids = ~0,
                                  strata = ~tag,
                                  data = larges,
                                  fpc = ~fpc,
                                  weights = ~NULL)
 #build survey design with non-adjusted  weights
-srv.dsgn.unadjusted <- svydesign(ids = ~ 0, # no clusters
+srv.dsgn.unadjusted.larges <- svydesign(ids = ~ 0, # no clusters
                       strata = ~tag,
                       data = larges,
                       fpc = ~fpc,
@@ -1434,7 +1595,7 @@ srv.dsgn.unadjusted <- svydesign(ids = ~ 0, # no clusters
 #                       fpc = ~fpc,
 #                       weights = ~final.weight.nonresponse)
 #PostStratify by fee code
-ps.dsgn.fee.code <- postStratify(design = srv.dsgn.unadjusted,
+ps.dsgn.fee.code <- postStratify(design = srv.dsgn.unadjusted.larges,
                         strata = ~Fee_Code,
                         partial = TRUE,
                         population = N.PS)
@@ -1444,7 +1605,7 @@ ps.dsgn.fee.code.SC <- postStratify(design = ps.dsgn.fee.code,
                                     partial = TRUE,
                                     population = N.SC)
 #do both together
-ps.dsgn.larges <- postStratify(design = srv.dsgn.unadjusted,
+ps.dsgn.larges <- postStratify(design = srv.dsgn.unadjusted.larges,
                                     strata = ~Fee_Code + postStrata,
                                     partial = TRUE,
                                     population = N.PS.SC)
@@ -1496,7 +1657,7 @@ tab_fee_need_cond <- svytable(~Fee_Code + late_fees_YN,
     ungroup()
 # repeate for unadjusted weights
 tab_fee_need_cond_unwt <- svytable(~Fee_Code + late_fees_YN,
-                         design = srv.dsgn.unadjusted) %>%
+                         design = srv.dsgn.unadjusted.larges) %>%
   # Add conditional proportions to table
     as.data.frame() %>%
     group_by(Fee_Code) %>%
@@ -1531,12 +1692,197 @@ larges <- cbind(larges, weights(ps.dsgn.larges))
 larges %<>% rename(c("final.weight" = `weights(ps.dsgn.larges)`))
 ```
 
+```{r}
+weightedHist <- larges %>% 
+  ggplot(aes(x = `Total number of delinquent residential accounts`, weight = final.weight, fill = Fee_Code)) +
+  geom_histogram(bins = 40)+
+  scale_x_log10() +
+  scale_y_continuous(limits = c(0,25)) +
+  labs(title = "Weighted")
+
+unweightedHist <- larges %>% 
+  ggplot(aes(x = `Total number of delinquent residential accounts`, fill = Fee_Code)) +
+  geom_histogram(bins = 40)+
+  scale_x_log10()+
+  scale_y_continuous(limits = c(0,25)) +
+  labs(title = "unweighted")
+
+grid.arrange(unweightedHist,weightedHist)
+```
+
+
+
+Totals summary for larges between weighting schemes are compared below. 
+```{r totals summary larges}
+#calcualte unweighted totals
+srv.total.unweighted <- svytotal(~dollars_del_acc_TotR + dollars_del_dw_TotR + `Total number of delinquent residential accounts` + num_del_acc_plan +
+                         late_fees_YN + late_fees_dollars,
+                         srv.dsgn.unweighted.larges, na.rm = TRUE)
+srv.total.unweighted <- data.frame(srv.total.unweighted)
+#reassign names
+srv.total.unweighted <- setNames(cbind(rownames(srv.total.unweighted), srv.total.unweighted, row.names = NULL),
+         c("variable", "total.unweighted", "total.SE.unweighted")) 
+
+#calcualte un-adjusted weights totals
+srv.total.unadjusted <- svytotal(~dollars_del_acc_TotR + dollars_del_dw_TotR + `Total number of delinquent residential accounts` + num_del_acc_plan +
+                         late_fees_YN + late_fees_dollars, 
+                         srv.dsgn.unadjusted.larges, na.rm = TRUE)
+srv.total.unadjusted <- data.frame(srv.total.unadjusted)
+#reassign names
+srv.total.unadjusted <- setNames(cbind(rownames(srv.total.unadjusted), srv.total.unadjusted, row.names = NULL),
+         c("variable", "total.unadjusted", "SE.unadjusted")) 
+
+#calcualte post-stratification totals
+post.strat.total  <-  svytotal(~dollars_del_acc_TotR + dollars_del_dw_TotR + `Total number of delinquent residential accounts` + num_del_acc_plan +
+                         late_fees_YN + late_fees_dollars,
+                         ps.dsgn.larges, na.rm = TRUE)
+
+post.strat.total <- data.frame(post.strat.total)
+post.strat.total <- setNames(cbind(rownames(post.strat.total), post.strat.total, row.names = NULL),
+         c("variable", "post.strat.total", "post.strate.SE"))
+
+#join tables
+largeSurveySummaryTotal <- left_join(left_join(srv.total.unweighted,srv.total.unadjusted,
+                                            by ="variable"),post.strat.total)
+#save
+write.csv(largeSurveySummaryTotal,
+          file = "R/output/largeSurveySummaryTotal.csv")
+#print
+largeSurveySummaryTotal
+```
+Just for debt.
+```{r totals summary for larges}
+#calcualte unweighted total debt
+srv.total.unweighted.debt <- as.data.frame(svytotal(~dollars_del_acc_TotR, 
+                         srv.dsgn.unweighted.larges, na.rm = TRUE))
+#reassign names
+srv.total.unweighted.debt <- setNames(cbind(rownames(srv.total.unweighted.debt), srv.total.unweighted.debt, row.names = NULL),
+         c("variable", "srv.total.unweighted", "srv.SE.unweighted")) 
+
+#calcualte un-adjusted weights total debt
+srv.total.unadjusted.debt <- as.data.frame(svytotal(~dollars_del_acc_TotR, 
+                         srv.dsgn.unadjusted.larges, na.rm = TRUE))
+#reassign names
+srv.total.unadjusted.debt <- setNames(cbind(rownames(srv.total.unadjusted.debt), srv.total.unadjusted.debt, row.names = NULL),
+         c("variable", "srv.total.unadjusted", "srv.SE.unadjusted")) 
+
+#calcualte post-stratification totals
+post.strat.total.debt  <-  as.data.frame(svytotal(~dollars_del_acc_TotR,
+                         ps.dsgn.larges, na.rm = TRUE))
+
+post.strat.total.debt <- setNames(cbind(rownames(post.strat.total.debt), post.strat.total.debt, row.names = NULL),
+         c("variable", "post.strat.total", "post.strate.SE"))
+
+#join tables
+largeSurveySummaryTotalDebt <- left_join(left_join(srv.total.unadjusted.debt, post.strat.total.debt, by = "variable"),srv.total.unweighted.debt)
+#save
+write.csv(largeSurveySummaryTotalDebt,
+          file = "R/output/largeSurveySummaryTotalDebt.csv")
+#print
+largeSurveySummaryTotalDebt
+```
+
+Just for drinking water debt.
+```{r totals summary for larges}
+#calcualte unweighted drinking water debt
+srv.total.unweighted.debt <- as.data.frame(svytotal(~dollars_del_dw_TotR, 
+                         srv.dsgn.unweighted.larges, na.rm = TRUE))
+#reassign names
+srv.total.unweighted.debt <- setNames(cbind(rownames(srv.total.unweighted.debt), srv.total.unweighted.debt, row.names = NULL),
+         c("variable", "srv.total.unweighted", "srv.SE.unweighted")) 
+
+#calcualte un-adjusted weights drinking water debt
+srv.total.unadjusted.debt <- as.data.frame(svytotal(~dollars_del_dw_TotR, 
+                         srv.dsgn.unadjusted.larges, na.rm = TRUE))
+#reassign names
+srv.total.unadjusted.debt <- setNames(cbind(rownames(srv.total.unadjusted.debt), srv.total.unadjusted.debt, row.names = NULL),
+         c("variable", "srv.total.unadjusted", "srv.SE.unadjusted")) 
+
+#calcualte post-stratification totals
+post.strat.total.debt  <-  as.data.frame(svytotal(~dollars_del_dw_TotR,
+                         ps.dsgn.larges, na.rm = TRUE))
+
+post.strat.total.debt <- setNames(cbind(rownames(post.strat.total.debt), post.strat.total.debt, row.names = NULL),
+         c("variable", "post.strat.total", "post.strate.SE"))
+
+#join tables
+largeSurveySummaryDWDebt <- left_join(left_join(srv.total.unadjusted.debt, post.strat.total.debt, by = "variable"),srv.total.unweighted.debt)
+#save
+write.csv(largeSurveySummaryDWDebt,
+          file = "R/output/largeSurveySummaryDWDebt.csv")
+#print
+largeSurveySummaryDWDebt
+```
+
+Now for number of delinquent accounts.
+```{r totals summary for larges}
+#calcualte unweighted total accounts
+srv.total.unweighted.accounts <- as.data.frame(svytotal(~`Total number of delinquent residential accounts`, 
+                         srv.dsgn.unweighted.larges, na.rm = TRUE))
+#reassign names
+srv.total.unweighted.accounts <- setNames(cbind(rownames(srv.total.unweighted.accounts), srv.total.unweighted.accounts, row.names = NULL),
+         c("variable", "srv.total.unweighted", "srv.SE.unweighted")) 
+
+#calcualte un-adjusted weights total accounts
+srv.total.unadjusted.accounts <- as.data.frame(svytotal(~`Total number of delinquent residential accounts`, 
+                         srv.dsgn.unadjusted.larges, na.rm = TRUE))
+#reassign names
+srv.total.unadjusted.accounts <- setNames(cbind(rownames(srv.total.unadjusted.accounts), srv.total.unadjusted.accounts, row.names = NULL),
+         c("variable", "srv.total.unadjusted", "srv.SE.unadjusted")) 
+
+#calcualte post-stratification totals
+post.strat.total.accounts  <-  as.data.frame(svytotal(~`Total number of delinquent residential accounts`,
+                         ps.dsgn.larges, na.rm = TRUE))
+
+post.strat.total.accounts <- setNames(cbind(rownames(post.strat.total.accounts), post.strat.total.accounts, row.names = NULL),
+         c("variable", "post.strat.total", "post.strate.SE"))
+
+#join tables
+largeSurveySummaryTotalaccounts <- left_join(left_join(srv.total.unadjusted.accounts, post.strat.total.accounts, by = "variable"),srv.total.unweighted.accounts)
+#save
+write.csv(largeSurveySummaryTotalaccounts,
+          file = "R/output/largeSurveySummaryTotalaccounts.csv")
+#print
+largeSurveySummaryTotalaccounts
+```
+
+
+Totals can be visualized graphically.
+
+
+Now that we have our adjusted weights, let's extract them and bind to the dataframes.
+```{r}
+#bind post-stratified weights to all smalls (no volunteers)
+allSmalls.requested.responded <- cbind(allSmalls.requested.responded, weights(ps.dsgn))
+#bind post-stratified weights to imputed survey with volunteers
+imputedSmalls.survey <- cbind(imputedSmalls.survey, weights(ps.dsgn.imputed.volunteers))
+
+#Save to csv
+# write.csv(x = allSmalls.requested.responded %>% 
+#              select(PWSID,`weights(ps.dsgn)`),
+#            file = "Datasets/noVolunteerSurveyWEIGHTS.csv"
+#            )
+
+#Save to csv
+ write.csv(x = imputedSmalls.survey %>% 
+             select(PWSID,`weights(ps.dsgn.imputed.volunteers)`),
+           file = "Datasets/fullSurveyWEIGHTS.csv"
+           )
+#Save to csv
+write.csv(x = imputedSmalls.survey,
+           file = "Datasets/fullSurveyIMPUTED.csv")
+
+```
+
+
+
 Now that we have our adjusted weights, let's extract them and bind to the dataframes.
 ```{r}
 #Save to csv
 write.csv(x = larges,
            file = "Datasets/fullSurveyLarges.csv")
 ```
+
 
 
 <!-- #### Raking  -->
@@ -1670,7 +2016,7 @@ Above is totals for smalls. 57,595,916 +- 2,470,236.
 
 Below is for larges (all expenses)
 ```{r}
-#smalls
+#larges
 svytotal(~dollars_del_acc_TotR, 
          design = ps.dsgn.larges,
          na.rm = TRUE)
@@ -1678,46 +2024,47 @@ svytotal(~dollars_del_acc_TotR,
 And below for just drinking water expenses.
 
 ```{r}
-#smalls
+#larges
 svytotal(~dollars_del_dw_TotR, 
          design = ps.dsgn.larges,
          na.rm = TRUE)
 ```
+And for smalls.
+
 
 All of these data can be viewed as a table. 
 ```{r}
 # construct and display a frequency table STRATIFIED
-tab_debt_cond_lrg <- svytable(~Fee_Code + dollars_del_acc_TotR,
-                         design = ps.dsgn.larges) %>%
-  # Add conditional proportions to table
-    as.data.frame() %>%
-    group_by(Fee_Code) %>%
-    mutate(n_Fee_Code = sum(Freq), Prop_Need = Freq/n_Fee_Code) %>%
-    ungroup()
+tab_debt_lrg <- svyby(~dollars_del_dw_TotR, 
+         by = ~Fee_Code, 
+         design = ps.dsgn.larges,
+      FUN = svytotal,
+         na.rm = TRUE) %>%
+    as.data.frame()
 # repeate for unadjusted weights
-tab_debt_cond__lrg_unwt <- svytable(~Fee_Code + dollars_del_acc_TotR,
-                         design = srv.dsgn.unadjusted) %>%
-  # Add conditional proportions to table
-    as.data.frame() %>%
-    group_by(Fee_Code) %>%
-    mutate(n_Fee_Code = sum(Freq), Prop_Need = Freq/n_Fee_Code) %>%
-    ungroup()
+tab_debt_lrg_unweighted <- svyby(~dollars_del_dw_TotR, 
+         by = ~Fee_Code, 
+         design = srv.dsgn.unweighted.larges,
+      FUN = svytotal,
+         na.rm = TRUE) %>%
+    as.data.frame()
+
 ```
 
 ```{r}
 # Create a segmented bar graph of the conditional proportions in table
-p1 <- ggplot(data = tab_fee_need_cond,
-       mapping = aes(x = Fee_Code, y = Prop_Need, fill = late_fees_YN)) + 
+p1 <- ggplot(data = tab_debt_cond_lrg,
+       mapping = aes(x = Fee_Code, y = Prop_Need)) + 
   geom_col() + 
   coord_flip() +
-  labs(title = "Late Fees (Post-Stratifed)",
+  labs(title = "Total Debt (Post-Stratifed)",
        xlab = "Proportion")
 #before strat
-p2 <- ggplot(data = tab_fee_need_cond_unwt,
-       mapping = aes(x = Fee_Code, y = Prop_Need, fill = late_fees_YN)) + 
+p2 <- ggplot(data = tab_debt_cond__lrg_unwt,
+       mapping = aes(x = Fee_Code, y = Prop_Need)) + 
   geom_col() + 
   coord_flip() +
-  labs(title = "Late Fees (unadjusted weights)",
+  labs(title = "Total Debt (unadjusted weights)",
        xlab = "Proportion")
 
 grid.arrange(p1, p2)
