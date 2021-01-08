@@ -46,6 +46,7 @@ library(NonProbEst) #nonprobability estimation: matchins
 library(psych) #for making scatterplot matrices
 library(car) #outliers
 library(prettydoc)
+library(BAMMtools) #jenki's breaks
 options(scipen = 9999)
 options(dplyr.width = Inf)
 
@@ -59,15 +60,22 @@ options(dplyr.width = Inf)
 ##### Read in Data #####
 #excel doc contains individual spreadsheets for small/medium and large PWS'. Also one big spreadsheet for zip codes. Read in smalls/medium and large individually, but join both to zip
 #just completed
- smalls <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Small System Financial Qs") 
+smalls <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Small System Financial Qs") 
 # #just completed
 larges <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Large System Financial Qs") 
 # #zip codes for joining
- zip <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Combined Zip Table")
+zip <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Combined Zip Table")
 # #for comparing all data
+# covid data for all systems
+covid <- read_excel("Datasets/CWS_w_PWSID_COVID_UE_data.xlsx", sheet = "Sheet1") %>% 
+  select(-c(Fee_Code, Service_Connections, Population, County, Regulating_Agency, Water_System_Name))
+  
 # AllPopConnections <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Population and Connections") 
 # #ALL Community Water Systems
 AllSystems <- read_excel("Datasets/CWS_fmt_PWSID.xlsx", na = "") 
+#separate all larges for extrapolation
+allLarges <- AllSystems %>% 
+  filter(Service_Connections > 10000)
 # ## Joined list of surveys requested, responded, voluntary with all response data generated from econ_impacts_plots_post_survey.R script
 allSmalls <- read.csv("Datasets/AllSystems_Surveys_final.csv", stringsAsFactors = TRUE) %>%  filter(Service_Connections <10000) %>% 
   filter(Fee_Code !="WH") %>%  #filter out wholesalers 
@@ -83,7 +91,7 @@ risk_scores <- read_excel("Python/risk_scores.xlsx") %>% mutate_if(is.character,
 # #responses for smalls
 # smalls <- smalls %>% mutate_if(is.character, as.factor) 
 # #responses for larges
-larges <- larges %>% mutate_if(is.character, as.factor) 
+
 #zip codes for all
 zip <- zip %>% mutate_if(is.character, as.factor)
 zip <- right_join(zip, pop_weighted_characteristics, by = "PWSID")
@@ -91,7 +99,34 @@ zip <- left_join(zip, risk_scores, by ="PWSID")
 #join zip and income characteristics to smalls and larges
 allSmalls <- left_join(allSmalls, zip) %>% distinct(PWSID, .keep_all = TRUE) %>%  droplevels()
 # smalls <- left_join(smalls, zip, by = "PWSID") %>% distinct(PWSID, .keep_all = TRUE) #must clean dupes
-# larges <- left_join(larges, zip, by = "PWSID") %>% distinct(PWSID, .keep_all = TRUE) #must clean dupes
+allLarges <- left_join(allLarges, zip, by = "PWSID") %>% 
+  distinct(PWSID, .keep_all = TRUE) %>% #must clean dupes
+  droplevels() #unnecessary factors
+allLarges %<>%  select(-c(cash:Risk_label)) #drop empty columns
+
+##join all larges with surveyed larges
+#cleanup duplicate columns in larges
+larges %<>%  select(-c(sys_name, Population,`Service Connections`))
+#join
+allLarges %<>% left_join(larges, allLarges, by = "PWSID")
+
+#recode non-respondents
+allLarges$responded[is.na(allLarges$responded)] <- "n"
+#provide tag for all
+allLarges$tag[is.na(allLarges$tag)] <- "E"
+#convert char to factors
+allLarges %<>% mutate_if(is.character, as.factor)
+
+## Join covid data to all
+allSmalls <- left_join(allSmalls, covid, by = "PWSID") %>% 
+  distinct(PWSID, .keep_all = TRUE) %>% 
+  droplevels()
+
+allLarges <- left_join(allLarges, covid, by = "PWSID") %>% 
+  distinct(PWSID, .keep_all = TRUE) %>% 
+  droplevels()
+
+
 # #keep it clean
 rm(zip)
 rm(pop_weighted_characteristics)
@@ -396,7 +431,7 @@ Survey weights are a key component to producing population estimates. As describ
 The first basic step to make reliable extrapolations to the population is to generate base weights. Note that this is one of three weight adjustments that will be applied,including non-response and calibration adjustments to weights.
 The first step in weighing is taking into account the different probabilities of being sampled that respondents may have simply based on proportions in the population. This is also known as generating *base weights*. Note that this survey is a random stratified sampling design without replacement. We will calculate inclusion probabilities for each strata for the small systems (tags A, B, C, D). Large systems (>10,000 service connections) will be treated as a single strata (E) for the calculation of base weights.  
 
-```{r calculate probabilities and base weights}
+```{r calculate probabilities and base weights for small systems}
 probSumm <- allSmalls %>% 
   filter(voluntary != "y") %>% #remove volunteers
   mutate(sample = case_when(requested == "y" ~ 1,requested == "n" ~ 0)) %>% #provide integer tag for sampled
@@ -414,6 +449,7 @@ probSumm
 Note in the code above that *finite population correction* (fpc) is defined as the value of the sampling rate, *n/N* - not *1 - n/N* - which is the textbook definition of the *fpc*. This is an idiosyncracy of the *survey* package in R and is consistent with other programming languages such as Stata or SAS. 
 
 We can see here that the probability of being chosen within each strata is slightly different. A basic but important test that should be performed after computing the probabilities is making sure that all probabilities are between 0 and 1.
+
 We will also calculate the scaled base weights, which should add up to the total number of respondents.
 
 ```{r, results= 'hide'}
@@ -475,7 +511,7 @@ To correct for these differential probabilities, we must design weights (sometim
 
 A simple interpretation of design weights is ‘the number of units in our population that each unit in our sample represents’. There is a simple but important test that we should perform after computing design weights. **The sum of all design weights should be equal to the total number of units in our population.** 
 
-Now to ensure design weights sum up to the entire population from which each population (bin) was drawn, we repeat the code from above.
+Now to ensure design weights sum up to the entire population from which each population (bin) was drawn, we repeat the code from above for all smalls. 
 ```{r}
 allSmalls %>% 
   mutate(sample = case_when(requested == "y" ~ 1,requested == "n" ~ 0)) %>% #provide integer tag for sampled
@@ -483,6 +519,20 @@ allSmalls %>%
   summarize(n = n(),samples = sum(sample), prob = samples/n, base.weight = 1/prob, 
             sum.base.weight = base.weight* samples) %>% 
   drop_na
+```
+
+
+Below these steps are briefly repeated for large systems (greater than 10,000 service connections).
+```{r calculate probabilities and base weights for large systems}
+probSumm <- allLarges %>% 
+  mutate(sample = case_when(responded == "y" ~ 1,responded == "n" ~ 0))  %>% #provide integer tag for sampled
+  group_by(tag) %>% 
+  summarize(N = n(),samples = sum(sample), prob = samples/N, base.weight = 1/prob,
+            sum.base.weight = base.weight * samples, fpc = samples/N)
+#join the probability to each sample
+allLarges <- right_join(allLarges, probSumm, by = "tag")
+#print
+probSumm
 ```
 
 
@@ -1026,6 +1076,7 @@ Here we can see the strong linear relationship between cash total and service co
 
 ### Calibration
 
+#### Small Systems
 The code below uses the *sampling* package to select a sample with probability proportional to the median 12 month household income . The method of selection is to randomize the order of the population and then select a systematic sample (see Hartley and Rao 1962).
 ```{r}
 #get population totals for items of interest
@@ -1295,6 +1346,197 @@ write.csv(x = imputedSmalls.survey,
 
 ```
 
+#### Large systems
+The above steps are repeated for large systems, using service connections asa proxy for representativeness. Jenk's Natural Breaks are used to bin systems naturally by service connections for calibration.
+
+```{r}
+#jenk's breaks for larges
+#determine mean and stdev
+allLarges %>% 
+  summarize(mean = mean(Service_Connections),
+            var = var(Service_Connections))
+```
+Above we can see the mean and variance of service ceonntions for large systems. This is visualized as histrograms.
+```{r}
+allLarges %>% 
+  ggplot(aes(x = log10(Service_Connections), fill = responded)) +
+  geom_histogram()
+```
+Natural breaks are determined using the Jenk's method.
+```{r}
+#### Natural Breaks ####
+#Determine natural breaks and assign
+breaks <- getJenksBreaks(allLarges$Service_Connections, 4)
+
+#specify bin labels
+postStrata <- c("A", "B", "C")#, "D")#, "E", "F")#, "G", "H", "I")
+
+#bucket values into bins
+bins <- cut(allLarges$Service_Connections,
+            breaks = breaks,
+            include.lowest = TRUE,
+            right = FALSE,
+            labels = postStrata)
+
+#inspect bins
+summary(bins)
+```
+A summary of the number of systems in each bin is shown above,.
+```{r}
+breaks
+```
+The discrete breaks for service connections is above. The next chunk joins these breaks to the dataset.
+```{r}
+#Store group as new column
+allLarges <-as_tibble(allLarges) %>% 
+  mutate(postStrata = case_when(
+    Service_Connections >= breaks[1] & Service_Connections < breaks[2] ~postStrata[1],
+    Service_Connections >= breaks[2] & Service_Connections < breaks[3] ~postStrata[2],
+    Service_Connections >= breaks[3] & Service_Connections <= breaks[4] ~postStrata[3],
+  ))
+
+#tag is character vector, so convert to factor
+allLarges$postStrata <- factor(allLarges$postStrata,
+                    ordered = FALSE)
+```
+
+Now that we have defined strata to adjust the data with, calibration can be carried out. There are two fee codes for larges (C1 and DAVCL). These will also be used to calibrate the surveys.
+```{r}
+#get population totals for items of interest
+N.PS <- xtabs(~Fee_Code, data = allLarges)
+N.SC <- xtabs(~postStrata, data = allLarges)
+#combined
+N.PS.SC <- xtabs(~Fee_Code + postStrata, data = allLarges)
+```
+
+
+```{r}
+require(survey)
+#separate samples from population
+larges <- allLarges %>% 
+  filter(responded == "y")
+#build survey design with no weights
+srv.dsgn.unweighted <- svydesign(ids = ~0,
+                                 strata = ~tag,
+                                 data = larges,
+                                 fpc = ~fpc,
+                                 weights = ~NULL)
+#build survey design with non-adjusted  weights
+srv.dsgn.unadjusted <- svydesign(ids = ~ 0, # no clusters
+                      strata = ~tag,
+                      data = larges,
+                      fpc = ~fpc,
+                      weights = ~base.weight)
+# #build survey design with adjusted non-response weights
+# srv.dsgn <- svydesign(ids = ~ 0, # no clusters
+#                       strata = ~tag,
+#                       data = allSmalls.requested.responded,
+#                       fpc = ~fpc,
+#                       weights = ~final.weight.nonresponse)
+#PostStratify by fee code
+ps.dsgn.fee.code <- postStratify(design = srv.dsgn.unadjusted,
+                        strata = ~Fee_Code,
+                        partial = TRUE,
+                        population = N.PS)
+#Post stratify further by service connections
+ps.dsgn.fee.code.SC <- postStratify(design = ps.dsgn.fee.code,
+                                    strata = ~postStrata,
+                                    partial = TRUE,
+                                    population = N.SC)
+#do both together
+ps.dsgn.larges <- postStratify(design = srv.dsgn.unadjusted,
+                                    strata = ~Fee_Code + postStrata,
+                                    partial = TRUE,
+                                    population = N.PS.SC)
+
+```
+
+Weights have now been adjusted for fee codes and service connections. The interaction of these weights are seen below.
+
+```{r}
+#if multiple post-strata are used, check that weights are calibrated
+svytotal(~interaction(Fee_Code, postStrata), ps.dsgn.larges)
+```
+
+Let's compare the weights calculated from post-stratification with the non-reponse-adjusted weights and the volunteer imputed survey weights.
+
+```{r}
+#examine new weights
+rbind(summary(weights(srv.dsgn.unadjusted)),summary(weights(ps.dsgn.fee.code)), summary(weights(ps.dsgn.fee.code.SC)), summary(weights(ps.dsgn.larges)))
+```
+We can see that post-stratification by fee code alone (second row) did not alter the weights significantly.Further post-stratification by service connection natural breaks increased the range of weights. The final row is the completed design.
+
+The estimated proportion of fee codes and their their SEs are reported below for the post-stratified.
+```{r}
+svytotal(~Fee_Code, ps.dsgn.larges, na.rm = TRUE)
+```
+
+Coefficients of variation produced by the post-stratification are provided below.
+```{r}
+cv(svytotal(~Fee_Code, ps.dsgn.larges, na.rm = TRUE))
+```
+If we compare these values to those in the original survey design (without post-stratification), we can see the differences in totals and standard errors.
+```{r}
+svytotal(~Fee_Code, srv.dsgn.unadjusted, na.rm = TRUE)
+```
+A marked decrease in variance is noted with post-stratificaiton.
+```{r}
+cv(svytotal(~Fee_Code, srv.dsgn.unadjusted, na.rm = TRUE))
+```
+
+
+```{r}
+# construct and display a frequency table STRATIFIED
+tab_fee_need_cond <- svytable(~Fee_Code + late_fees_YN,
+                         design = ps.dsgn.larges) %>%
+  # Add conditional proportions to table
+    as.data.frame() %>%
+    group_by(Fee_Code) %>%
+    mutate(n_Fee_Code = sum(Freq), Prop_Need = Freq/n_Fee_Code) %>%
+    ungroup()
+# repeate for unadjusted weights
+tab_fee_need_cond_unwt <- svytable(~Fee_Code + late_fees_YN,
+                         design = srv.dsgn.unadjusted) %>%
+  # Add conditional proportions to table
+    as.data.frame() %>%
+    group_by(Fee_Code) %>%
+    mutate(n_Fee_Code = sum(Freq), Prop_Need = Freq/n_Fee_Code) %>%
+    ungroup()
+```
+
+```{r}
+# Create a segmented bar graph of the conditional proportions in table
+p1 <- ggplot(data = tab_fee_need_cond,
+       mapping = aes(x = Fee_Code, y = Prop_Need, fill = late_fees_YN)) + 
+  geom_col() + 
+  coord_flip() +
+  labs(title = "Late Fees (Post-Stratifed)",
+       xlab = "Proportion")
+#before strat
+p2 <- ggplot(data = tab_fee_need_cond_unwt,
+       mapping = aes(x = Fee_Code, y = Prop_Need, fill = late_fees_YN)) + 
+  geom_col() + 
+  coord_flip() +
+  labs(title = "Late Fees (unadjusted weights)",
+       xlab = "Proportion")
+
+grid.arrange(p1, p2)
+```
+
+Now to ensure adjustedweights sum up to the entire population from which each population was drawn.
+```{r}
+#bind post-stratified weights to larges
+larges <- cbind(larges, weights(ps.dsgn.larges))
+  
+larges %<>% rename(c("final.weight" = `weights(ps.dsgn.larges)`))
+```
+
+Now that we have our adjusted weights, let's extract them and bind to the dataframes.
+```{r}
+#Save to csv
+write.csv(x = larges,
+           file = "Datasets/fullSurveyLarges.csv")
+```
 
 
 <!-- #### Raking  -->
@@ -1387,13 +1629,105 @@ write.csv(x = imputedSmalls.survey,
 
 
 
-
-
 # Summary Statistics
-Now that we have our adjusted weights and a complete (imputed) dataset, it's time to compute summary statistics (totals, means, variances, ratios, and quantiles). Let's ask what the mean cash reserve total is for each of the strata. The mean for each bin is interpreted as the proportion for each category.
+Now that we have our adjusted weights and a complete (imputed) dataset, it's time to compute summary statistics (totals, means, variances, ratios, and quantiles).Estimates for statewide number of delinquent accounts for smalls and larges are calcualted below.  
+
+```{r}
+#smalls
+svyby(~delinquent_amount_dollars, 
+         by = ~Fee_Code, 
+         design = ps.dsgn,
+      FUN = svytotal,
+         na.rm = TRUE)
+```
+Above is for smalls. Below is for larges for total dollars of delinquent accouts (including other expenses such as power).
+```{r}
+#larges
+svyby(~dollars_del_acc_TotR, 
+         by = ~Fee_Code, 
+         design = ps.dsgn.larges,
+      FUN = svytotal,
+         na.rm = TRUE)
+```
+Below is for larges for total dollars of delinquent accouts (drinking water alone).
+```{r}
+#larges
+svyby(~dollars_del_dw_TotR, 
+         by = ~Fee_Code, 
+         design = ps.dsgn.larges,
+      FUN = svytotal,
+         na.rm = TRUE)
+```
+
+Now simply totals without binning.
+```{r}
+#smalls
+svytotal(~delinquent_amount_dollars, 
+         design = ps.dsgn,
+         na.rm = TRUE)
+```
+Above is totals for smalls. 57,595,916 +- 2,470,236.
+
+Below is for larges (all expenses)
+```{r}
+#smalls
+svytotal(~dollars_del_acc_TotR, 
+         design = ps.dsgn.larges,
+         na.rm = TRUE)
+```
+And below for just drinking water expenses.
+
+```{r}
+#smalls
+svytotal(~dollars_del_dw_TotR, 
+         design = ps.dsgn.larges,
+         na.rm = TRUE)
+```
+
+All of these data can be viewed as a table. 
+```{r}
+# construct and display a frequency table STRATIFIED
+tab_debt_cond_lrg <- svytable(~Fee_Code + dollars_del_acc_TotR,
+                         design = ps.dsgn.larges) %>%
+  # Add conditional proportions to table
+    as.data.frame() %>%
+    group_by(Fee_Code) %>%
+    mutate(n_Fee_Code = sum(Freq), Prop_Need = Freq/n_Fee_Code) %>%
+    ungroup()
+# repeate for unadjusted weights
+tab_debt_cond__lrg_unwt <- svytable(~Fee_Code + dollars_del_acc_TotR,
+                         design = srv.dsgn.unadjusted) %>%
+  # Add conditional proportions to table
+    as.data.frame() %>%
+    group_by(Fee_Code) %>%
+    mutate(n_Fee_Code = sum(Freq), Prop_Need = Freq/n_Fee_Code) %>%
+    ungroup()
+```
+
+```{r}
+# Create a segmented bar graph of the conditional proportions in table
+p1 <- ggplot(data = tab_fee_need_cond,
+       mapping = aes(x = Fee_Code, y = Prop_Need, fill = late_fees_YN)) + 
+  geom_col() + 
+  coord_flip() +
+  labs(title = "Late Fees (Post-Stratifed)",
+       xlab = "Proportion")
+#before strat
+p2 <- ggplot(data = tab_fee_need_cond_unwt,
+       mapping = aes(x = Fee_Code, y = Prop_Need, fill = late_fees_YN)) + 
+  geom_col() + 
+  coord_flip() +
+  labs(title = "Late Fees (unadjusted weights)",
+       xlab = "Proportion")
+
+grid.arrange(p1, p2)
+```
+
+Let's ask what the mean cash reserve total is for each of the strata. The mean for each bin is interpreted as the proportion for each category.
+
 
 ```{r summary statistics}
- svymean(~cash_reserve_total + tag, dclus1)
+# svymean(~cash_reserve_total + tag, dclus1)
 ```
 
 
