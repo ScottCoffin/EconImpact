@@ -61,13 +61,13 @@ options(dplyr.width = Inf)
 #just completed
  smalls <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Small System Financial Qs") 
 # #just completed
-# larges <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Large System Financial Qs") 
+larges <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Large System Financial Qs") 
 # #zip codes for joining
  zip <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Combined Zip Table")
 # #for comparing all data
 # AllPopConnections <- read_excel("Datasets/combined_results_w_pop.xlsx", sheet = "Population and Connections") 
 # #ALL Community Water Systems
-# AllSystems <- read_excel("Datasets/CWS_fmt_PWSID.xlsx", na = "") 
+AllSystems <- read_excel("Datasets/CWS_fmt_PWSID.xlsx", na = "") 
 # ## Joined list of surveys requested, responded, voluntary with all response data generated from econ_impacts_plots_post_survey.R script
 allSmalls <- read.csv("Datasets/AllSystems_Surveys_final.csv", stringsAsFactors = TRUE) %>%  filter(Service_Connections <10000) %>% 
   filter(Fee_Code !="WH") %>%  #filter out wholesalers 
@@ -83,7 +83,7 @@ risk_scores <- read_excel("Python/risk_scores.xlsx") %>% mutate_if(is.character,
 # #responses for smalls
 # smalls <- smalls %>% mutate_if(is.character, as.factor) 
 # #responses for larges
-# larges <- larges %>% mutate_if(is.character, as.factor) 
+larges <- larges %>% mutate_if(is.character, as.factor) 
 #zip codes for all
 zip <- zip %>% mutate_if(is.character, as.factor)
 zip <- right_join(zip, pop_weighted_characteristics, by = "PWSID")
@@ -394,7 +394,7 @@ Survey weights are a key component to producing population estimates. As describ
 
 ## Base Weights
 The first basic step to make reliable extrapolations to the population is to generate base weights. Note that this is one of three weight adjustments that will be applied,including non-response and calibration adjustments to weights.
-The first step in weighing is taking into account the different probabilities of being sampled that respondents may have simply based on proportions in the population. This is also known as generating *base weights*. Note that this survey is a random stratified sampling design without replacement. We will calculate inclusion probabilities for each strata (tags A, B, C, D).  
+The first step in weighing is taking into account the different probabilities of being sampled that respondents may have simply based on proportions in the population. This is also known as generating *base weights*. Note that this survey is a random stratified sampling design without replacement. We will calculate inclusion probabilities for each strata for the small systems (tags A, B, C, D). Large systems (>10,000 service connections) will be treated as a single strata (E) for the calculation of base weights.  
 
 ```{r calculate probabilities and base weights}
 probSumm <- allSmalls %>% 
