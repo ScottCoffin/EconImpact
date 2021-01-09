@@ -1,0 +1,8 @@
+systems,variable,post.strat.total,post.strate.SE,srv.total.unadjusted,srv.SE.unadjusted,srv.total.unweighted,srv.SE.unweighted,srv.total.imputed.volunteers,srv.SE.imputed.volunteers
+smalls,delinquent_amount_dollars," $57,595,915.65 "," $2,470,236.22 "," $42,872,919.72 "," $1,728,194.93 "," $29,264,024.60 "," $1,130,438.86 "," $55,753,342.33 "," $4,216,020.50 "
+larges,delinquent_amount_dollars," $737,938,711.42 "," $215,985,228.38 "," $1,143,909,455.38 "," $533,991,657.10 "," $656,593,768.11 "," $306,506,422.01 ", NA , NA 
+SUM,delinquent_amount_dollars," $795,534,627.06 "," $218,455,464.60 "," $1,186,782,375.10 "," $535,719,852.03 "," $685,857,792.71 "," $307,636,860.88 ", NA , NA 
+smalls,`Total number of delinquent residential accounts`,1.47E+05,7.53E+03,1.10E+05,5.52E+03,7.42E+04,3.32E+03,1.17E+05,5.72E+03
+larges,`Total number of delinquent residential accounts`,1.70E+05,1.79E+04,1.67E+05,1.76E+04,9.56E+04,1.01E+04,NA,NA
+SUM,`Total number of delinquent residential accounts`,3.17E+05,2.55E+04,2.76E+05,2.31E+04,1.70E+05,1.34E+04,1.17E+05,5.72E+03
+larges,dollars_del_dw_TotR," $202,528,669.74 "," $39,918,335.00 "," $294,011,783.43 "," $94,561,238.64 "," $168,760,126.81 "," $54,277,302.90 ",NA,NA
