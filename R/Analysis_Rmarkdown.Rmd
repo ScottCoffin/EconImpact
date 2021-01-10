@@ -1306,203 +1306,202 @@ We can see that the dataset that included the volunteers dramatically inflates t
 ```{r}
 rm(imputedSmalls.requested.voluntary.NR, allSmalls.requested.NR, chk1, chk2, crf.prob2, crfsrvy.prob2, crf.srvy.2, crf.prob, crf.srvy, crfsrvy.prob, fitResponse, allSmalls.requested.response.model, allSmalls.simple, baseWeights, completenessSummary, log.reg.m, out, probSumm, t1, t2, tab, tmp1, tmp2, transposed, x.matrix, rpart.prob, predM, MissingMatrix, scaledSumm, smalls, srv.dsgn, rclus1)
 ```
-<!-- ### Large Systems -->
-<!-- First let's see the response rate for each of the bins for the large systems. -->
-<!-- ```{r} -->
-<!-- allLarges %>% filter(requested == "y") %>%  -->
-<!--   summarize(completeness = sum(response)/n() * 100 , completed = sum(response), total = n()) -->
-<!-- ``` -->
+### Large Systems
+First let's see the response rate for each of the bins for the large systems.
+```{r}
+allLarges %>% filter(requested == "y") %>%
+  summarize(completeness = sum(response)/n() * 100 , completed = sum(response), total = n())
+```
 
-<!-- Computing the probability of replying to this survey is challenging because we can not directly observe the probability of replying to the survey, therefore we need to estimate it. This may be done using information which we know for both respondent and non-respondent units. The most reliable (albeit most complicated) of calculating non-response probabilities is through predictive modelling. -->
+Computing the probability of replying to this survey is challenging because we can not directly observe the probability of replying to the survey, therefore we need to estimate it. This may be done using information which we know for both respondent and non-respondent units. The most reliable (albeit most complicated) of calculating non-response probabilities is through predictive modelling.
 
-<!-- [Valliant et al (2013)](https://link.springer.com/book/10.1007%2F978-1-4614-6449-5) recommend estimating the response propensities and then grouping them in classes. The grouping step should avoid extreme weights. One way of estimating the response propensities is using logistic regression. This logistic regression should be unweighted. We will use a general linear model function to predict non-responses with hypothesized response variables for which we have data, including service connections, population, fee code, and regulating agency. -->
-<!-- ```{r modeling response propensity} -->
-<!-- #trim data to those in sample list with auxiliary data -->
-<!-- allLarges.requested.response.model <- allLarges %>%  -->
-<!--   filter(requested == "y") %>%  -->
-<!--   select(response, Service_Connections, Population, CES_3.0_Score, Median_12month_HH_income, -->
-<!--          Median_rent_pct_income) %>%  -->
-<!--   drop_na() -->
+[Valliant et al (2013)](https://link.springer.com/book/10.1007%2F978-1-4614-6449-5) recommend estimating the response propensities and then grouping them in classes. The grouping step should avoid extreme weights. One way of estimating the response propensities is using logistic regression. This logistic regression should be unweighted. We will use a general linear model function to predict non-responses with hypothesized response variables for which we have data, including service connections, population, fee code, and regulating agency.
+```{r modeling response propensity}
+#trim data to those in sample list with auxiliary data
+allLarges.requested.response.model <- allLarges %>%
+  filter(requested == "y") %>%
+  select(response, Service_Connections, Population, CES_3.0_Score, Median_12month_HH_income,
+         Median_rent_pct_income) %>%
+  drop_na()
 
-<!-- #prepare formula -->
-<!-- formula.resp <- as.formula("response ~ Service_Connections + Population + CES_3.0_Score + Median_12month_HH_income + Median_rent_pct_income") -->
-<!-- options(na.action = 'na.pass') -->
+#prepare formula
+formula.resp <- as.formula("response ~ Service_Connections + Population + CES_3.0_Score + Median_12month_HH_income + Median_rent_pct_income")
+options(na.action = 'na.pass')
 
-<!-- #format as matrix -->
-<!-- x.matrix <- model.matrix(formula.resp , data = allLarges.requested.response.model)[, -1] -->
+#format as matrix
+x.matrix <- model.matrix(formula.resp , data = allLarges.requested.response.model)[, -1]
 
-<!-- #fit binomial model -->
-<!-- log.reg.m <- glm(formula.resp, data = allLarges.requested.response.model,family = "binomial") -->
+#fit binomial model
+log.reg.m <- glm(formula.resp, data = allLarges.requested.response.model,family = "binomial")
 
-<!-- coef.response.log <- coef(log.reg.m) -->
-<!-- predicted.log <- log.reg.m$fitted.values -->
-<!-- non.responsepredicted.log <- predicted.log -->
+coef.response.log <- coef(log.reg.m)
+predicted.log <- log.reg.m$fitted.values
+non.responsepredicted.log <- predicted.log
 
-<!-- predicted.log %>% head() -->
-<!-- ``` -->
-<!-- The above output shows the first six estimated response propensities of our dataset. Since we don't have pardata for all samples, we are now computing our predictor estimates from a subset of sampled units. -->
+predicted.log %>% head()
+```
+The above output shows the first six estimated response propensities of our dataset. Since we don't have pardata for all samples, we are now computing our predictor estimates from a subset of sampled units.
 
-<!-- Let's define our survey structure in the *survey* package.  -->
-<!-- ```{r survey initiate, results='hide'} -->
-<!-- ##### Specify sampling design #### -->
-<!-- #here we will use our imputed survey dataset -->
-<!-- #(stratified) -->
-<!-- srv.dsgn.larges <- svydesign(data = allLarges,  -->
-<!--                         weights = ~base.weight, #if weighted. Don't forget tilde ~ -->
-<!--                         fpc = ~fpc, #population size for each stratum -->
-<!--                         strata = ~tag, #bins -->
-<!--                         id = ~1) #specifies independent sampling (without replacement) -->
-<!-- #print summary of design -->
-<!-- summary(srv.dsgn.larges) -->
-<!-- ``` -->
+Let's define our survey structure in the *survey* package.
+```{r survey initiate, results='hide'}
+##### Specify sampling design ####
+#here we will use our imputed survey dataset
+#(stratified)
+srv.dsgn.larges <- svydesign(data = allLarges,
+                        weights = ~base.weight, #if weighted. Don't forget tilde ~
+                        fpc = ~fpc, #population size for each stratum
+                        strata = ~tag, #bins
+                        id = ~1) #specifies independent sampling (without replacement)
+#print summary of design
+summary(srv.dsgn.larges)
+```
 
-<!-- The package *PracTools* has tools to determine propensity classes. We will use service connections, population, fee code, and regulating agency as predictor variables. -->
+The package *PracTools* has tools to determine propensity classes. We will use service connections, population, fee code, and regulating agency as predictor variables.
 
-<!-- First let's start by testing which variables are predictive of response.  -->
-<!-- ```{r} -->
-<!-- #redefine all larges -->
-<!-- allLarges.requested <- allLarges %>% filter(requested == "y") -->
-<!-- #fit -->
-<!-- fitResponse <- lm(response ~ Service_Connections + Population + Median_12month_HH_income + Median_rent_pct_income + CES_3.0_Score + Fee_Code, na.action = na.omit, data = allLarges.requested) -->
-<!-- summary(fitResponse) -->
-<!-- ``` -->
-<!-- Unlike small systems, there are no good predictors for response propensity for large systems. This may be indicative of a non-systematic non-response. -->
-<!-- ```{r} -->
-<!-- #be sure to use the dataset with non-response data -->
-<!-- out <- pclass(formula = response ~ Service_Connections + Population + Fee_Code, -->
-<!--               data = allLarges.requested, -->
-<!--               type = "unwtd", #already have base weights -->
-<!--               link = "logit", -->
-<!--               numcl = 4) #classes to create -->
-<!-- table(out$p.class, useNA = "always") # ensures no unit has a missing class value -->
-<!-- ``` -->
-<!-- Further examine propensities. -->
-<!-- ```{r} -->
-<!-- summary(out$propensities) -->
-<!-- ``` -->
-<!-- These propensity classes can be viewed in boxplot form. -->
-<!-- ```{r} -->
-<!-- boxplot(out$propensities ~ out$p.class) -->
-<!-- ``` -->
-<!-- We can see discrete propensity classes with rather tight spread for the four uppermost categories. Let's perform a check on covariate balance by fitting an ANOVA model to service connections, which is continuous. We do not use the survey weights below since the interest is in whether balance has been achieved in the sample that was selected. Checks could be made using the weights, in which case the check would be on whether the census-fit model shows evidence of balance. -->
-<!-- ```{r} -->
-<!-- #extract classes -->
-<!-- p.class <- out$p.class -->
-<!-- #build glm -->
-<!-- chk1 <- glm(Service_Connections ~ p.class + response + p.class*response, -->
-<!-- data = allLarges.requested) -->
-<!-- #print -->
-<!-- summary(chk1) -->
-<!-- ``` -->
-<!-- In this case, the *p.class* factors do not have coefficients that are significant (except for the upper-most p-class). Further, the p.class*resp interactions are not significant—the desired outcomes if mean service connections differs between classes but is the same for respondents and nonrespondents within a class. Another check is to fit a second model that includes only -->
-<!-- *p.class* and to test whether the models are equivalent: -->
-<!-- ```{r} -->
-<!-- chk2 <- glm(Service_Connections ~ p.class, data = allLarges.requested) -->
-<!-- anova(chk2, chk1, test="F") -->
-<!-- ``` -->
-<!-- The F-statistic is 0.0026 with 146 and 143 degrees of freedom and has a p-value of 0.9998. Thus, the model without a factor for responding is judged to be adequate. -->
+First let's start by testing which variables are predictive of response.
+```{r}
+#redefine all larges
+allLarges.requested <- allLarges %>% filter(requested == "y")
+#fit
+fitResponse <- lm(response ~ Service_Connections + Population + Median_12month_HH_income + Median_rent_pct_income + CES_3.0_Score + Fee_Code, na.action = na.omit, data = allLarges.requested)
+summary(fitResponse)
+```
+Unlike small systems, there are no good predictors for response propensity for large systems. This may be indicative of a non-systematic non-response.
+```{r}
+#be sure to use the dataset with non-response data
+out <- pclass(formula = response ~ Service_Connections + Population + Fee_Code,
+              data = allLarges.requested,
+              type = "unwtd", #already have base weights
+              link = "logit",
+              numcl = 4) #classes to create
+table(out$p.class, useNA = "always") # ensures no unit has a missing class value
+```
+Further examine propensities.
+```{r}
+summary(out$propensities)
+```
+These propensity classes can be viewed in boxplot form.
+```{r}
+boxplot(out$propensities ~ out$p.class)
+```
+We can see discrete propensity classes with rather tight spread for the four uppermost categories. Let's perform a check on covariate balance by fitting an ANOVA model to service connections, which is continuous. We do not use the survey weights below since the interest is in whether balance has been achieved in the sample that was selected. Checks could be made using the weights, in which case the check would be on whether the census-fit model shows evidence of balance.
+```{r}
+#extract classes
+p.class <- out$p.class
+#build glm
+chk1 <- glm(Service_Connections ~ p.class + response + p.class*response,
+data = allLarges.requested)
+#print
+summary(chk1)
+```
+In this case, the *p.class* factors do not have coefficients that are significant (except for the upper-most p-class). Further, the p.class*resp interactions are not significant—the desired outcomes if mean service connections differs between classes but is the same for respondents and nonrespondents within a class. Another check is to fit a second model that includes only
+*p.class* and to test whether the models are equivalent:
+```{r}
+chk2 <- glm(Service_Connections ~ p.class, data = allLarges.requested)
+anova(chk2, chk1, test="F")
+```
+The F-statistic is 0.0026 with 146 and 143 degrees of freedom and has a p-value of 0.9998. Thus, the model without a factor for responding is judged to be adequate.
 
-<!-- #### Classification Algorithms = CART -->
-<!-- In the nonrespondent application, the decision tree will classify cases using available covariates into classes that are related to their likelihood of being respondents. Advantages of CART compared to propensity modeling are that:  -->
-<!-- 1. Interactions of covariates are handled automatically. -->
-<!-- 2. The way in which covariates enter the model does not have to be made -->
-<!-- explicit. -->
-<!-- 3. Selection of which covariates and associated interactions should be included -->
-<!-- is done automatically. -->
-<!-- 4. Variable values, whether categorical or continuous, are combined (grouped) -->
-<!-- automatically. -->
-<!-- ```{r} -->
-<!-- require(rpart) -->
-<!-- set.seed(15097) -->
-<!-- t1 <- rpart(response ~ Service_Connections + Population + Fee_Code +  Median_rent_pct_income +  Median_12month_HH_income, -->
-<!--             method = "class", -->
-<!--             control = rpart.control(minbucket = 15, cp=0), #requires that there be at least 19 cases (responded + nonrespondents) in the final grouping of variable values of the terminal node of the tre.. -->
-<!--             data = allLarges.requested) -->
-<!-- print(t1, digits=4) -->
-<!-- ``` -->
-<!-- Plot an interpretable tree. -->
-<!-- ```{r} -->
-<!-- require(rpart.plot) -->
-<!-- cols <- ifelse(t1$frame$yval == 1, "gray50", "black") -->
-<!-- prp(t1, main="Tree for NR adjustment classes (includes imputed values)", -->
-<!--     extra=106, # display prob of survival and percent of obs -->
-<!--     nn=TRUE, # display node numbers -->
-<!--     fallen.leaves=TRUE, # put leaves on the bottom of page -->
-<!--     branch=.5, # change angle of branch lines -->
-<!--     faclen=0, # do not abbreviate factor levels -->
-<!--     trace=1, # print automatically calculated cex -->
-<!--     shadow.col="gray", # shadows under the leaves -->
-<!--     branch.lty=1, # draw branches using solid lines -->
-<!--     branch.type=5, # branch lines width = weight(frame$wt), no. of cases here -->
-<!--     split.cex=1.2, # make split text larger than node text -->
-<!--     split.prefix="is ", # put "is " before split text -->
-<!--     split.suffix="?", # put "?" after split text -->
-<!--     col=cols, border.col=cols, # cols[2] if survived -->
-<!--     split.box.col="lightgray", # lightgray split boxes (default is white) -->
-<!--     split.border.col="darkgray", # darkgray border on split boxes -->
-<!--     split.round=0.5) # round the split box corners a tad -->
-<!-- ``` -->
+#### Classification Algorithms = CART
+In the nonrespondent application, the decision tree will classify cases using available covariates into classes that are related to their likelihood of being respondents. Advantages of CART compared to propensity modeling are that:
+1. Interactions of covariates are handled automatically.
+2. The way in which covariates enter the model does not have to be made
+explicit.
+3. Selection of which covariates and associated interactions should be included
+is done automatically.
+4. Variable values, whether categorical or continuous, are combined (grouped)
+automatically.
+```{r}
+require(rpart)
+set.seed(15097)
+t1 <- rpart(response ~ Service_Connections + Population + Fee_Code +  Median_rent_pct_income +  Median_12month_HH_income,
+            method = "class",
+            control = rpart.control(minbucket = 15, cp=0), #requires that there be at least 19 cases (responded + nonrespondents) in the final grouping of variable values of the terminal node of the tre..
+            data = allLarges.requested)
+print(t1, digits=4)
+```
+Plot an interpretable tree.
+```{r}
+require(rpart.plot)
+cols <- ifelse(t1$frame$yval == 1, "gray50", "black")
+prp(t1, main="Tree for NR adjustment classes (includes imputed values)",
+    extra=106, # display prob of survival and percent of obs
+    nn=TRUE, # display node numbers
+    fallen.leaves=TRUE, # put leaves on the bottom of page
+    branch=.5, # change angle of branch lines
+    faclen=0, # do not abbreviate factor levels
+    trace=1, # print automatically calculated cex
+    shadow.col="gray", # shadows under the leaves
+    branch.lty=1, # draw branches using solid lines
+    branch.type=5, # branch lines width = weight(frame$wt), no. of cases here
+    split.cex=1.2, # make split text larger than node text
+    split.prefix="is ", # put "is " before split text
+    split.suffix="?", # put "?" after split text
+    col=cols, border.col=cols, # cols[2] if survived
+    split.box.col="lightgray", # lightgray split boxes (default is white)
+    split.border.col="darkgray", # darkgray border on split boxes
+    split.round=0.5) # round the split box corners a tad
+```
 
-<!-- #### Classification  -->
-<!-- A single regression tree does tend to overfit the data in the sense of creating a model that may not be accurate for a new dataset (like the units that were not sampled or another sample selected using the same methods that is also subject to nonresponse). For a nonresponse adjustment, the fitted model from a single tree may not be the best representation of the underlying response mechanism. Breiman (2001) formulated random forests as a way of creating predictions that suffer less from this “shrinkage” problem. Random forests -->
-<!-- fit many regression trees and average the results with the goal of producing more robust, lower variance predictions. Random forests can incorporate a large number of weighting variables and can find complicated relationships between adjustment variables that a researcher may not be aware of in advance( [Zhao et al. 2016](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4818178/)). -->
+#### Classification
+A single regression tree does tend to overfit the data in the sense of creating a model that may not be accurate for a new dataset (like the units that were not sampled or another sample selected using the same methods that is also subject to nonresponse). For a nonresponse adjustment, the fitted model from a single tree may not be the best representation of the underlying response mechanism. Breiman (2001) formulated random forests as a way of creating predictions that suffer less from this “shrinkage” problem. Random forests
+fit many regression trees and average the results with the goal of producing more robust, lower variance predictions. Random forests can incorporate a large number of weighting variables and can find complicated relationships between adjustment variables that a researcher may not be aware of in advance( [Zhao et al. 2016](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4818178/)).
 
-<!-- ```{r, results='hide'} -->
-<!-- require(party) -->
-<!-- crf.srvy.larges <- cforest(as.factor(response) ~ Service_Connections + Fee_Code + Population + Median_rent_pct_income +  Median_12month_HH_income,  -->
-<!--                     controls = cforest_control(ntree = 500,  -->
-<!--                                                mincriterion = qnorm(0.8),  -->
-<!--                                                trace = TRUE), # adds project bar because it's very slow -->
-<!--                     data=allLarges.requested) -->
+```{r, results='hide'}
+require(party)
+crf.srvy.larges <- cforest(as.factor(response) ~ Service_Connections + Fee_Code + Population + Median_rent_pct_income +  Median_12month_HH_income,
+                    controls = cforest_control(ntree = 500,
+                                               mincriterion = qnorm(0.8),
+                                               trace = TRUE), # adds project bar because it's very slow
+                    data=allLarges.requested)
 
-<!-- crfsrvy.prob.larges <- predict(crf.srvy.larges,newdata=allLarges.requested,type="prob") -->
-<!-- rpart.prob.larges <- predict(t1, newdata=allLarges.requested,type="prob") -->
-<!-- crf.prob.larges <- matrix(unlist(crfsrvy.prob.larges), ncol=2, byrow=TRUE) -->
-<!-- apply(crf.prob.larges,2,mean) -->
-<!-- #[1] 0.1701657 0.8298343 -->
-<!-- tab <- round(cbind(by(rpart.prob.larges[,2], INDICES=t1$where, mean), by(crf.prob.larges[,2], INDICES=t1$where, mean)), 4) -->
-<!-- colnames(tab) <- c("rpart", "cforest") -->
-<!-- tab -->
-<!-- ``` -->
-<!-- The estimated overall response rate is 0.8298. This is very close to the actual overall response rate of 0.833. Above we can see the different propensity classes predicted by the rforest and the cforest. The cforest seemed to generate more realistic propensity classes that match the data (see boxplot above). -->
+crfsrvy.prob.larges <- predict(crf.srvy.larges,newdata=allLarges.requested,type="prob")
+rpart.prob.larges <- predict(t1, newdata=allLarges.requested,type="prob")
+crf.prob.larges <- matrix(unlist(crfsrvy.prob.larges), ncol=2, byrow=TRUE)
+apply(crf.prob.larges,2,mean)
+#[1] 0.1701657 0.8298343
+tab <- round(cbind(by(rpart.prob.larges[,2], INDICES=t1$where, mean), by(crf.prob.larges[,2], INDICES=t1$where, mean)), 4)
+colnames(tab) <- c("rpart", "cforest")
+tab
+```
+The estimated overall response rate is 0.8298. This is very close to the actual overall response rate of 0.833. Above we can see the different propensity classes predicted by the rforest and the cforest. The cforest seemed to generate more realistic propensity classes that match the data (see boxplot above).
 
-<!-- Adjusted weights can now be computed and merged into the data file.  -->
+Adjusted weights can now be computed and merged into the data file.
 
-<!-- ```{r} -->
-<!-- ##### join to non-imputed data #### -->
-<!-- # compute NR adjustments based on classes formed by tree -->
-<!-- # Unweighted response rate -->
+```{r}
+##### join to non-imputed data ####
+# compute NR adjustments based on classes formed by tree
+# Unweighted response rate
 
-<!-- # unwt.rr <- by(as.numeric(unlist(allLarges.requested[, "response"])), crf.prob.larges[,2], mean) -->
+#unwt.rr <- by(as.numeric(unlist(allLarges.requested[, "response"])), crf.prob.larges[,2], mean)
 
-<!-- # # Weighted response rate -->
-<!-- wt.rr <- by(data = data.frame(resp = as.numeric(unlist(allLarges.requested[, "response"])),  -->
-<!--                                wt = as.numeric(unlist(allLarges.requested[,"base.weight"]))), -->
-<!--             crf.prob.larges[,2], function(x) {weighted.mean(x$resp, x$wt)} ) -->
-<!-- #  -->
-<!-- # unwt.rr -->
-<!-- # # merge NR class and response rates onto  file -->
-<!-- # allLarges.requested.NR <- cbind(allLarges.requested, NR.class=crf.prob.larges[,2]) -->
-<!-- # tmp2 <- data.frame(cbind(NR.class=as.numeric(names(wt.rr)), unwt.rr[,2], wt.rr)) -->
-<!-- # allLarges.requested.NR <- left_join(allLarges.requested.NR, data.frame(tmp2), by="NR.class") -->
-<!-- #  -->
-<!-- # allLarges.requested.NR <- allLarges.requested.NR[order(allLarges.requested.NR$PWSID),] -->
+# # Weighted response rate
+#wt.rr <- by(data = data.frame(resp = as.numeric(unlist(allLarges.requested[, "response"])),wt = as.numeric(unlist(allLarges.requested[,"base.weight"]))),
+#            crf.prob.larges[,2], function(x) {weighted.mean(x$resp, x$wt)} )
+#
+# unwt.rr
+# # merge NR class and response rates onto  file
+ # allLarges.requested.NR <- cbind(allLarges.requested, NR.class=crf.prob.larges[,2])
+ # tmp2 <- data.frame(cbind(NR.class=as.numeric(names(wt.rr)), unwt.rr, wt.rr))
+ # allLarges.requested.NR <- left_join(allLarges.requested.NR, data.frame(tmp2), by="NR.class")
+#
+ # allLarges.requested.NR <- allLarges.requested.NR[order(allLarges.requested.NR$PWSID),]
 
-<!-- #extract response propensities from CART -->
-<!-- unwt.rr <- as.data.frame(crf.prob.larges[,2]) -->
-<!-- #append to dataset -->
-<!-- allLarges.requested.NR <- cbind(allLarges.requested, unwt.rr) -->
-<!-- allLarges.requested.NR %<>%  rename(c("unwt.rr" = `crf.prob.larges[, 2]`)) -->
-<!-- #use inverse of response probabilitiy to generate non-response weight -->
-<!-- allLarges.requested.NR %<>%  -->
-<!--   mutate(unwt.rr.final = 1/unwt.rr) -->
-<!-- #display -->
-<!-- allLarges.requested.NR$unwt.rr.final %>% -->
-<!--   unique %>% -->
-<!--   sort -->
-<!-- ``` -->
+#extract response propensities from CART
+unwt.rr <- as.data.frame(crf.prob.larges[,2])
+#append to dataset
+allLarges.requested.NR <- cbind(allLarges.requested, unwt.rr)
+allLarges.requested.NR %<>%  rename(c("unwt.rr" = `crf.prob.larges[, 2]`))
+#use inverse of response probabilitiy to generate non-response weight
+allLarges.requested.NR %<>%
+  mutate(unwt.rr.final = 1/unwt.rr)
+#display
+allLarges.requested.NR$unwt.rr.final %>%
+  unique %>%
+  sort
+```
 
-<!-- Here we can see the range of weighted nonresponse weights for the non-imputed survey (without volunteers). -->
+Here we can see the range of weighted nonresponse weights for the non-imputed survey (without volunteers).
 
 <!-- These nonresponse weights are plotted relative to respective baseweights below. -->
 <!-- ```{r} -->
@@ -1514,41 +1513,44 @@ rm(imputedSmalls.requested.voluntary.NR, allSmalls.requested.NR, chk1, chk2, crf
 <!--   theme_minimal() -->
 <!-- ``` -->
 
-<!-- If we had no information about population estimates, we would end the weighting procedure here. The ‘final weight’ would be the multiplication of both base scaled weight and the scaled non-response weight. Here we will call this new weights ‘final weights’ although we still have to perform adjustments to them and so will not really be ‘final’. -->
+If we had no information about population estimates, we would end the weighting procedure here. The ‘final weight’ would be the multiplication of both base scaled weight and the scaled non-response weight. Here we will call this new weights ‘final weights’ although we still have to perform adjustments to them and so will not really be ‘final’.
 
-<!-- Before going to the next step we will include the computed non-response weights using adjustment classes to the main ‘data’ dataframe object. Then we will drop all non-respondents as we are not going to use them any more in the next steps of our analysis. After that, we will scale the non-response weights to the sample of respondents and multiply the design weights and the non-response weights. -->
+Before going to the next step we will include the computed non-response weights using adjustment classes to the main ‘data’ dataframe object. Then we will drop all non-respondents as we are not going to use them any more in the next steps of our analysis. After that, we will scale the non-response weights to the sample of respondents and multiply the design weights and the non-response weights.
 
-<!-- ```{r} -->
-<!-- ##### Join to non-imputed data ##### -->
-<!-- #join imputed smalls weights to full data frame -->
-<!-- allLarges %<>%  -->
-<!--   left_join(allLarges.requested.NR %>% select(PWSID, unwt.rr, unwt.rr.final), -->
-<!--             by = "PWSID") -->
-<!-- allLarges %<>% mutate(final.weight.nonresponse = unwt.rr.final * base.weight) -->
+```{r}
+##### Join to non-imputed data #####
+#join imputed smalls weights to full data frame
+allLarges %<>%
+  left_join(allLarges.requested.NR %>% select(PWSID, unwt.rr, unwt.rr.final),
+            by = "PWSID")
+allLarges %<>% mutate(final.weight.nonresponse = (unwt.rr.final * base.weight)/1.4437)
 
-<!-- # #join non-response weights to just the sample frame -->
-<!-- # allLarges.requested.responded %<>%  -->
-<!-- #   left_join(allLarges.requested.NR %>% select(PWSID, unwt.rr, unwt.rr.final), -->
-<!-- #             by = "PWSID") -->
 
-<!-- # #join the final weights to the respondent list -->
-<!-- # allLarges.requested.responded %<>%  -->
-<!-- #   mutate(final.weight.nonresponse = unwt.rr.final * base.weight)  -->
+# #join non-response weights to just the sample frame
+# allLarges.requested.responded %<>%
+#   left_join(allLarges.requested.NR %>% select(PWSID, unwt.rr, unwt.rr.final),
+#             by = "PWSID")
 
-<!-- #view summary -->
-<!-- allLarges %>%  -->
-<!--   select(PWSID, base.weight, final.weight.nonresponse, N, samples) %>%  -->
-<!--   drop_na() %>%  -->
-<!--   summarize(sum.final.weight = sum(final.weight.nonresponse), totalSamples = max(samples), population = max(N), percent.diff = 100*(1 - sum.final.weight/(population)))  -->
-<!-- ``` -->
-<!-- Here we can see that the sum of the weights adjusted for non-response are slightly different from the population. This is fine as they are within 6%. The adjusted weights are plotted below: -->
+# #join the final weights to the respondent list
+# allLarges.requested.responded %<>%
+#   mutate(final.weight.nonresponse = unwt.rr.final * base.weight)
 
-<!-- ```{r} -->
-<!-- allSmalls.requested.responded %>%  -->
-<!--   ggplot(aes(x = base.weight, y =final.weight.nonresponse, color = Fee_Code, shape = tag)) + -->
-<!--   geom_point() -->
-<!-- ``` -->
-<!-- We can see clearly that the high non-response in the smaller bins has inflated the base weights.  -->
+#view summary
+allLarges %>%
+  select(PWSID, base.weight, final.weight.nonresponse, N, samples) %>%
+  drop_na() %>%
+  summarize(sum.final.weight = sum(final.weight.nonresponse), totalSamples = max(samples), population = max(N), percent.diff = 100*(1 - sum.final.weight/(population)))
+```
+Here we can see that the sum of the weights adjusted for non-response are the same as the population. The adjusted weights are plotted below:
+
+```{r}
+allLarges %>%
+  ggplot(aes(x = Median_12month_HH_income, y =final.weight.nonresponse)) +
+  geom_point(aes(color = Fee_Code))+
+  scale_color_viridis_d()+
+  geom_smooth()
+```
+Although the relationship between non-response and median 12 month household income is non-linear (as predicted above using a multi-variate, machine-learning classification-based approach), a relationship may be observed between response propensity and median income in the above figure.
 
 ## Weight Calibration
 
@@ -1630,7 +1632,7 @@ pairs.panels(aux.response,
 
 Here we can see that service connections and median 12 month household income are not good predictors of the service-connection *normalized* number of delinquent accounts. However, a strong relationship exists between the *normalized* number of delinquent accounts and the qualitative variable for months before assistance needed. This is not useful for raking, as neither variables are auxiliary, however this is an interesting (and expected) correlation. Again, median 12 month household income and months before assistance needed are significantly correlated. 
 
-To continue raking, we will now perform more formal analyses. Using all reliable, complete auxiliary data present, let's see the linear relationships to the continuous variable months before assistance needed (from factor)
+To continue raking, we will now perform more formal analyses. Using all reliable, complete auxiliary data present, let's see the linear relationships to the continuous variable months before assistance needed (from factor).
 ```{r}
 m2 <- glm(months_before_assist_num ~ Service_Connections + Median_12month_HH_income + Median_rent_pct_income + Fee_Code, na.action = na.exclude, data = allSmalls.requested.responded)
 summary(m2)
@@ -2158,13 +2160,20 @@ allLarges %>%
   summarize(mean = mean(Service_Connections),
             var = var(Service_Connections))
 ```
-Above we can see the mean and variance of service ceonntions for large systems. This is visualized as histrograms.
+Above we can see the mean and variance of service connections for large systems. This is visualized as histrograms.
 ```{r}
 allLarges %>% 
   ggplot(aes(x = log10(Service_Connections), fill = responded)) +
   geom_histogram()
 ```
-Natural breaks are determined using the Jenk's method.
+```{r}
+allLarges %>% 
+  ggplot(aes(x = log10(Median_12month_HH_income), fill = responded)) +
+ # geom_histogram(bins = 15) +
+  geom_density(alpha = 0.6)+
+  scale_fill_viridis_d()
+```
+Natural breaks of service connections and median 12-month household income are determined using the Jenk's method.
 ```{r}
 #### Natural Breaks ####
 #Determine natural breaks and assign
@@ -2183,11 +2192,7 @@ bins <- cut(allLarges$Service_Connections,
 #inspect bins
 summary(bins)
 ```
-A summary of the number of systems in each bin is shown above,.
-```{r}
-breaks
-```
-The discrete breaks for service connections is above. The next chunk joins these breaks to the dataset.
+A summary of the number of systems in each bin ( by service connections) is shown above.
 ```{r}
 #Store group as new column
 allLarges <-as_tibble(allLarges) %>% 
@@ -2200,23 +2205,84 @@ allLarges <-as_tibble(allLarges) %>%
 #tag is character vector, so convert to factor
 allLarges$postStrata <- factor(allLarges$postStrata,
                     ordered = FALSE)
+breaks
 ```
+The discrete breaks for service connections is above. These steps are repeated for median 12-month household income below.
+```{r}
+#### Natural Breaks ####
+#Determine natural breaks and assign
+breaks <- getJenksBreaks(allLarges$Median_12month_HH_income, 4)
 
-Now that we have defined strata to adjust the data with, calibration can be carried out. There are two fee codes for larges (C1 and DAVCL). These will also be used to calibrate the surveys.
+#specify bin labels
+postStrata_income <- c("A", "B", "C")#, "D")#, "E", "F")#, "G", "H", "I")
+
+#bucket values into bins
+bins <- cut(allLarges$Median_12month_HH_income,
+            breaks = breaks,
+            include.lowest = TRUE,
+            right = FALSE,
+            labels = postStrata_income)
+
+#inspect bins
+summary(bins)
+```
+A summary of the number of systems in each bin  (by median 12-month household income) is shown above.
+```{r}
+#Store group as new column
+allLarges <-as_tibble(allLarges) %>% 
+  mutate(postStrata_income = case_when(
+    Median_12month_HH_income >= breaks[1] & Median_12month_HH_income < breaks[2] ~postStrata_income[1],
+    Median_12month_HH_income >= breaks[2] & Median_12month_HH_income < breaks[3] ~postStrata_income[2],
+    Median_12month_HH_income >= breaks[3] & Median_12month_HH_income <= breaks[4] ~postStrata_income[3],
+  ))
+
+#replace missing value with median (B)
+allLarges$postStrata_income %<>% 
+  replace_na("B")
+
+#tag is character vector, so convert to factor
+allLarges$postStrata_income <- factor(allLarges$postStrata_income,
+                    ordered = FALSE)
+breaks
+```
+The discrete breaks for the three bins of income are displayed above (in US dollars). 
+
+Now that we have defined strata to adjust the data with, calibration can be carried out.  These will also be used to calibrate the surveys.
 ```{r}
 #get population totals for items of interest
 N.PS <- xtabs(~Fee_Code, data = allLarges)
 N.SC <- xtabs(~postStrata, data = allLarges)
+N.MH <- xtabs(~postStrata_income, data = allLarges)
 #combined
-N.PS.SC <- xtabs(~Fee_Code + postStrata, data = allLarges)
+N.PS.SC <- xtabs(#~Fee_Code + 
+  ~postStrata + postStrata_income, data = allLarges)
 ```
 
+Before calibration, non-response-adjusted weights will be examined for completeness.
 
 ```{r}
 require(survey)
 #separate samples from population
 larges <- allLarges %>% 
   filter(responded == "y")
+
+#examine adjusted weights
+summary(larges$final.weight.nonresponse)
+```
+
+It seems that 3 out of 150 weights are missing, likely due to missing data for predictor variables (likely median household income). Since this is a very small percentage of the total, replacement with mean values is reasonable.
+
+```{r}
+#several weights are missing. Replace with average values
+larges$final.weight.nonresponse %<>% 
+  replace_na(1.412023)
+
+#examine adjusted weights
+summary(larges$final.weight.nonresponse)
+```
+Now that there are no missing adjusted weights, calibration may proceed,
+
+```{r}
 #build survey design with no weights
 srv.dsgn.unweighted.larges <- svydesign(ids = ~0,
                                  strata = ~tag,
@@ -2229,14 +2295,16 @@ srv.dsgn.unadjusted.larges <- svydesign(ids = ~ 0, # no clusters
                       data = larges,
                       fpc = ~fpc,
                       weights = ~base.weight)
+
 # #build survey design with adjusted non-response weights
-# srv.dsgn <- svydesign(ids = ~ 0, # no clusters
-#                       strata = ~tag,
-#                       data = allSmalls.requested.responded,
-#                       fpc = ~fpc,
-#                       weights = ~final.weight.nonresponse)
+srv.dsgn.adjusted.larges <- svydesign(ids = ~ 0, # no clusters
+                      strata = ~tag,
+                      data = larges,
+                      fpc = ~fpc,
+                      weights = ~final.weight.nonresponse)
+
 #PostStratify by fee code
-ps.dsgn.fee.code <- postStratify(design = srv.dsgn.unadjusted.larges,
+ps.dsgn.fee.code <- postStratify(design = srv.dsgn.adjusted.larges,
                         strata = ~Fee_Code,
                         partial = TRUE,
                         population = N.PS)
@@ -2245,28 +2313,33 @@ ps.dsgn.fee.code.SC <- postStratify(design = ps.dsgn.fee.code,
                                     strata = ~postStrata,
                                     partial = TRUE,
                                     population = N.SC)
-#do both together
-ps.dsgn.larges <- postStratify(design = srv.dsgn.unadjusted.larges,
-                                    strata = ~Fee_Code + postStrata,
+#post-stratify by fee code, service connections, and income
+ps.dsgn.larges <- postStratify(design = srv.dsgn.adjusted.larges,
+                                    strata = #~Fee_Code + 
+                                 ~postStrata + postStrata_income,
                                     partial = TRUE,
                                     population = N.PS.SC)
 
 ```
 
-Weights have now been adjusted for fee codes and service connections. The interaction of these weights are seen below.
+Weights have now been adjusted for median household income and service connections. The interaction of these weights are seen below.
 
 ```{r}
 #if multiple post-strata are used, check that weights are calibrated
-svytotal(~interaction(Fee_Code, postStrata), ps.dsgn.larges)
+svytotal(~interaction(postStrata, postStrata_income), ps.dsgn.larges)
 ```
 
 Let's compare the weights calculated from post-stratification with the non-reponse-adjusted weights and the volunteer imputed survey weights.
 
 ```{r}
 #examine new weights
-rbind(summary(weights(srv.dsgn.unadjusted)),summary(weights(ps.dsgn.fee.code)), summary(weights(ps.dsgn.fee.code.SC)), summary(weights(ps.dsgn.larges)))
+weights.summary <- rbind(summary(weights(srv.dsgn.unadjusted.larges)),summary(weights(srv.dsgn.adjusted.larges)),
+      summary(weights(ps.dsgn.fee.code)), summary(weights(ps.dsgn.fee.code.SC)), summary(weights(ps.dsgn.larges)))
+#name rows
+rownames(weights.summary) <- c("Unadjusted", "Non-Response Adjusted", "Post-Stratified (fee codes)", "Post-Stratified(Fee Code/Srv.Conn)", "Post-Stratified (Income/Srv.Conn.)")
+weights.summary
 ```
-We can see that post-stratification by fee code alone (second row) did not alter the weights significantly.Further post-stratification by service connection natural breaks increased the range of weights. The final row is the completed design.
+We can see that post-stratification by fee code alone (second row) did not alter the weights significantly. Further post-stratification by service connection natural breaks and fee codes increased the range of weights, and notably lowered the minimum weights below nominal (demonstrating over-representation in the original sample). Post-stratification by service connections and median 12-month household income is virtually identical as post-stratification by fee code and service connections, albeit slightly right-shifted. Either will do.
 
 The estimated proportion of fee codes and their their SEs are reported below for the post-stratified.
 ```{r}
@@ -2279,13 +2352,75 @@ cv(svytotal(~Fee_Code, ps.dsgn.larges, na.rm = TRUE))
 ```
 If we compare these values to those in the original survey design (without post-stratification), we can see the differences in totals and standard errors.
 ```{r}
-svytotal(~Fee_Code, srv.dsgn.unadjusted, na.rm = TRUE)
+svytotal(~Fee_Code, srv.dsgn.unadjusted.larges, na.rm = TRUE)
 ```
-A marked decrease in variance is noted with post-stratificaiton.
+A slight decrease in variance is noted with post-stratificaiton.
 ```{r}
-cv(svytotal(~Fee_Code, srv.dsgn.unadjusted, na.rm = TRUE))
+cv(svytotal(~Fee_Code, srv.dsgn.unadjusted.larges, na.rm = TRUE))
 ```
 
+Total delinquent account (US dollars) is an important response variable. The impact of weighting on this extrapolation is explored below.
+```{r}
+svytotal(~dollars_del_acc_TotR, ps.dsgn.larges, na.rm = TRUE)
+```
+
+If we compare these values to those in the original survey design (without post-stratification), we can see the differences in totals and standard errors.
+```{r}
+svytotal(~dollars_del_acc_TotR, srv.dsgn.unadjusted.larges, na.rm = TRUE)
+```
+Post-stratification by service connections and median household income using Jenk's Natural Breaks decreased the variance in estimates of statewide large water system delinquent accounts by a factor of 38.97 times! Further, weight adjustment using non-response propensity and calibration decreased the statewide estimate of debt by a factor of 1.56, or 156%. These values are visualized below.
+```{r}
+#totals for no weights
+del_dollars_larges_unweighted <- data.frame(svytotal(~dollars_del_acc_TotR, srv.dsgn.unweighted.larges, na.rm = TRUE)) %>% mutate(calibration = "Unweighted")
+
+#totals for unadjusted weights (base weights)
+del_dollars_larges_unadjusted <- data.frame(svytotal(~dollars_del_acc_TotR, srv.dsgn.unadjusted.larges, na.rm = TRUE)) %>%  mutate(calibration = "Base Weights")
+
+#totals for unadjusted weights (response propensity)
+del_dollars_larges_adjusted <- data.frame(svytotal(~dollars_del_acc_TotR, srv.dsgn.adjusted.larges, na.rm = TRUE)) %>%  mutate(calibration = "Non-response Adjusted")
+
+#totals for adjusted weights (calibration)
+del_dollars_larges_calibrated_fee <- data.frame(svytotal(~dollars_del_acc_TotR, ps.dsgn.fee.code.SC, na.rm = TRUE)) %>% mutate(calibration = "Calibrated (Conn. & Fee Code)")
+
+#totals for adjusted weights (calibration)
+del_dollars_larges_calibrated <- data.frame(svytotal(~dollars_del_acc_TotR, ps.dsgn.larges, na.rm = TRUE)) %>% mutate(calibration = "Calibrated (Conn. & Income)")
+
+#join dataframes
+del_dollars_Larges_c1 <- rbind(del_dollars_larges_unweighted, 
+del_dollars_larges_unadjusted, del_dollars_larges_adjusted, del_dollars_larges_calibrated_fee, del_dollars_larges_calibrated)
+
+#add error bars
+del_dollars_Larges_comparison <- mutate(del_dollars_Larges_c1,
+                                 lower = total - 1.96*dollars_del_acc_TotR, #95% CI
+                                upper = total + 1.96*dollars_del_acc_TotR) %>%  #95% CI
+  mutate_if(is.character, as.factor)
+
+
+#Construct a barplot
+del_dollars_Larges_comparison %>% 
+  mutate(calibration = fct_relevel(calibration,
+                                   "Unweighted", "Base Weights", "Non-response Adjusted", "Calibrated (Conn. & Fee Code)", "Calibrated (Conn. & Income)")) %>% #manually reorder by calibration status
+ggplot(aes(x = calibration, y = total, 
+                     ymin = lower, ymax = upper, fill = calibration)) +
+  geom_col() +
+  scale_fill_viridis_d(option = "B", alpha = 0.9) +
+  scale_x_discrete(name = "Weight Calibration")+
+  scale_y_continuous(labels = scales::dollar_format()) +
+  labs(y = "Total Estimated Delinquent Amount in Dollars") +
+  geom_errorbar(width = 0.9) +
+  labs(title = "Systems >10,000 Service Connections (n = 150 out of 223)",
+       subtitle = "(Error Bars = 95% Confidence Intervals)") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        legend.box.background = element_rect(color = "black"),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+```
+The impact of weigthing (and adjusting weights using calibration) on both estimate totals and error can be seen above.
 
 ```{r}
 # construct and display a frequency table STRATIFIED
@@ -2303,10 +2438,7 @@ tab_fee_need_cond_unwt <- svytable(~Fee_Code + late_fees_YN,
     as.data.frame() %>%
     group_by(Fee_Code) %>%
     mutate(n_Fee_Code = sum(Freq), Prop_Need = Freq/n_Fee_Code) %>%
-    ungroup()
-```
-
-```{r}
+    ungroup() 
 # Create a segmented bar graph of the conditional proportions in table
 p1 <- ggplot(data = tab_fee_need_cond,
        mapping = aes(x = Fee_Code, y = Prop_Need, fill = late_fees_YN)) + 
@@ -2493,12 +2625,12 @@ largeSurveySummaryTotalaccounts
 Now that we have our adjusted weights, let's extract them and bind to the dataframes.
 ```{r}
 #bind post-stratified weights to all smalls (no volunteers)
-larges <- cbind(larges, weights(ps.dsgn.larges))
+#larges <- cbind(larges, weights(ps.dsgn.larges))
 
 #Save to csv
 write.csv(x = larges %>% 
-             select(PWSID,`weights(ps.dsgn.larges)`),
-           file = "Datasets/fullSurveyWEIGHTS.csv"
+             select(PWSID, final.weight, base.weight, fpc,voluntary),
+           file = "Datasets/largeSystemWEIGHTS.csv"
            )
 ```
 
