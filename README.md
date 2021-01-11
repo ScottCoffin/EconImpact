@@ -9,7 +9,7 @@ Purpose: Determine economic impacts to public water systems from COVID 19
 
 ## PRIORITIES
 1) Quantitative RISK based on operating cash on hand. Follow-up calls with 12 systems reported that they're not actually in dire predicaments. How confident are we in estimates of systems at risk within 90- 180- x- days.
-2) MHI as a predictor variable
+2) MHI as a predictor variable. DEMOGRAPHICS analysis.
 3) Simplify!
 
 ## Updates
