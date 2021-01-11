@@ -191,6 +191,10 @@ allLarges %<>%
 #provide integer tag for voluntary status  
 allLarges %<>% 
   mutate(volunteered = case_when(voluntary == "y" ~ 1,voluntary == "n" ~ 0))
+
+#data for imputation
+# allLarges.responded.preImputed <- allLarges %>% 
+#   filter(responded == "y")
 ```
 
 # Blending Probability and Non-Probability Samples
@@ -486,7 +490,7 @@ There are two approaches to multiple imputation, implemented by different packag
 
 * Conditional Multiple Imputation: Conditional MI, as indicated in its name, follows an iterative procedure, modeling the conditional distribution of a certain variable given the other variables. This technique allows users to be more flexible as a distribution is assumed for each variable rather than the whole dataset.
 
-If our data appears highly normal, we may use the first option. Let's examine service connections.
+If our data appears highly normal, we may use the first option. Let's examine service connections for small systems surveyed (<10,000).
 ```{r}
 allSmalls %>% 
 ggplot(aes(x = Service_Connections, fill = Fee_Code)) + 
@@ -522,7 +526,8 @@ Now that we have 3 complete datasets, the next step is to run an ols regression 
 
 Finally, we pool together the 3 coefficients estimated by the imputed dataset into 1 final regression coefficient, and estimate the variance using the *pool* command. With the assumption that regression coefficients are obtained from a multivariate normal distribution, in order to obtain the final coefficient we just take the mean of 3 values. We calculate the variance of the estimated coefficient by factoring in the within (accounting for differences in predicted values from the dataset regarding each observation) and between (accounting for differences between 3 datasets) imputation variance.
 
-## Mice Implementation
+## Smalls Imputation
+
 First let's start my building an Ordinary Least Squares (OLS) linear regression to predict cash in reserve (total) based on relevant predictors for all systems (e.g. service connections, median 12 month household income, delinquent number of accounts, delinquent amout in dollars, CalEnvrioScreen 3 scores). We will ignore the volunteer data for now. 
 ```{r}
 ## Estimate an OLS Regression
@@ -579,10 +584,11 @@ allSmalls.requested.responded %>%
 ```
 While it is possible that the Coachella Valley Water District has nearly 100 million dollars in cash reserve, it is an order of magnitude larger than every other system in the survey, yet does have a huge number of service connections. For the sake of imputation, this system will be excluded. 
 
-```{r, results = 'hide'}
-p_missing <- unlist(lapply(allSmalls.responded, function(x) sum(is.na(x))))/nrow(smalls)
-sort(p_missing[p_missing > 0], decreasing = TRUE)
-```
+ ```{r, results = 'hide'}
+# p_missing <- unlist(lapply(allSmalls.responded, function(x) sum(is.na(x))))/nrow(smalls)
+# sort(p_missing[p_missing > 0], decreasing = TRUE)
+ ```
+
 Many of these variables are missing at high rates, such as sub-metered status,and unrestricted cash reserve. I'll remove those. Also, the monetary values are bins and are not "missing" so much as they are just formatted long-wise binary. We'll remove those too.
 ```{r}
 #define sub dataset
@@ -814,6 +820,280 @@ rm(ini)
 rm(CES_3.0_Score_m)
 #visualize remaining missing values
 md.pattern(imputedSmalls)
+```
+Note that some variables are still missing, however these were deliberately not imputed either due to no being applicable (such as binned data) or would were calculated from other variables. 
+
+## Larges Imputation
+
+The above steps will be generally repeated for large systems (>10,000 service connections) surveyed. Prior to determining if multiple imputation is necessary (as opposed to row-wise deletion or mean imputation), primary auxiliary and response variables will be examined for completeness in the matrix below.
+
+```{r}
+larges <- allLarges %>% filter(responded == "y")
+#extract the meaningful parameters
+meaningfulVariables <- complete(larges) %>% select(dollars_del_acc_TotR, dollars_del_dw_TotR, Median_12month_HH_income, Service_Connections, Population, num_del_acc_plan)
+#the imputed data can also be extracted in long format.
+#c.long <- complete(imp, "long")  
+md.pattern(meaningfulVariables)
+```
+
+The matrix above shows relatively few responses are missing for most variables. These can be viewed in tabular format as well.
+
+```{r}
+#extract the meaningful parameters
+larges %>% 
+  select(dollars_del_acc_TotR, dollars_del_dw_TotR, Median_12month_HH_income, Service_Connections, Population, num_del_acc_plan, Fee_Code) %>% 
+  summarise_all(funs(sum(is.na(.)))) %>%  #summarize NA
+  t() #transpose
+```
+Luckily, auxiliary variables (service connections, population, fee code) are all complete. One system lacks median-12-month income data. Vital response variables are less complete with total delinquent dollars (drinking water) the most incomplete (49 out of 128 cases missing). Multiple imputation will be employed to fill in missing values using predictive statistics.
+
+An Ordinary Least Squares (OLS) linear regression is used to predict total delinquent dollars (i.e. debt) based on reasonable predictors that are available for all systems (e.g. service connections, population, median 12 month household income, median rent percent income, fee code, number of delinquent account plans). 
+```{r}
+## Estimate an OLS Regression
+fitols <- lm(dollars_del_dw_TotR ~ Service_Connections +  Median_12month_HH_income + Fee_Code + Population +
+               Median_rent_pct_income + num_del_acc_plan + dollars_del_acc_TotR,
+             na.action = na.omit, 
+             data = larges)
+summary(fitols)
+```
+As we can see in the table above, a significant number of observations were deleted due to missingness (56 out of 128). Since this is greater than 43% of the whole dataset, our survey would be limited in power. However, as seen in the above matrix, auxiliary variables are complete, and the OLS demonstrates a strong predictive power between population and delinquent drinking water dollars (*p* < 0.01). This is intuitive due to economies of scale. Further, since delinquent dollars (total) are more available, this response variable can be used to predict debt for drinking water (*p*<0.00001). Imputation of these values will decrease variance, but potentially increase the uncertainty of this survey (albeit slightly). The relationship between these two variables is demonstrated in a linear regression.
+
+```{r}
+## Estimate an OLS Regression
+summary(lm(dollars_del_dw_TotR ~ dollars_del_acc_TotR,
+             na.action = na.omit, 
+             data = larges))
+```
+This relationship is plotted below.
+
+```{r}
+#define linear relationship
+larges %>% 
+  ggplot(aes(x = log10(dollars_del_acc_TotR), y = log10(dollars_del_dw_TotR))) +
+  geom_point(aes(color = Fee_Code)) +
+  geom_smooth(method = "lm") +
+  stat_cor(label.y = 7)+ #this means at 35th unit in the y axis, the r squared and p value will be shown
+        stat_regline_equation(label.y = 6) + #this means at 30th unit regresion line equation will be shown
+  labs(title = "Linear Relationship between Total Debt and Drinking Water Debt",
+       subtitle = ">10,000 service connection systems")
+```
+
+Prior to imputation, the dataset should be prepared such that variables remain in their rawest form, so any categorical factors should be left as so, instead of using the ordinal transformed variable from above. Further, we want to remove variables that have haver than 25% missing values because they may mess up the imputation (no such variables). It's also important to remove variables that are highly correlated with others so as to stop the imputation working otherwise. Additionally, any extreme outliers should be removed, as they may dramatically impact results.
+
+```{r}
+require(reshape2)
+larges %>% 
+  select(PWSID, Service_Connections,  Median_12month_HH_income, dollars_del_dw_TotR, Fee_Code, Population,
+               Median_rent_pct_income,num_del_acc_plan, dollars_del_acc_TotR) %>% 
+  melt() %>%  #convert wide to long
+  ggplot(aes(x = value)) + 
+  stat_density() + 
+  facet_wrap(~variable, scales = "free")
+```
+Everything looks more or less realistic, however several variables would benefit from log10 transformation for visualizing and possibly for statistics. 
+
+```{r}
+require(reshape2)
+larges %>% 
+  select(PWSID, Service_Connections,  Median_12month_HH_income, dollars_del_dw_TotR, Fee_Code, Population,
+               Median_rent_pct_income,num_del_acc_plan, dollars_del_acc_TotR) %>% 
+  melt() %>%  #convert wide to long
+   mutate_if(~is.numeric(.) && (.) > 0, log10) %>% 
+  ggplot(aes(x = value)) + 
+  stat_density() + 
+  facet_wrap(~variable, scales = "free")
+```
+Now distributions look more or less "normal."
+
+```{r}
+#log transform
+larges %<>% mutate(log.dollars_del_dw_TotR = log10(dollars_del_dw_TotR),
+                         log.dollars_del_acc_TotR = log10(dollars_del_acc_TotR))
+
+#define sub dataset  for imputation
+larges.simple <- larges %>% 
+  select(PWSID, log.dollars_del_acc_TotR, log.dollars_del_dw_TotR, Median_12month_HH_income, Service_Connections, num_del_acc_plan, Median_rent_pct_income)
+
+# #split the other half of the dataset for easy joining
+# larges.rest <- larges %>% 
+#   select(-c(log.dollars_del_acc_TotR, log.dollars_del_dw_TotR, Median_12month_HH_income, Service_Connections, num_del_acc_plan, Median_rent_pct_income))
+```
+At this step, we need to specify distributions for our to-be imputed variables and determine which variable we would like to leave out of the imputation prediction process. We will extract information on the predictor matrix and imputation methods to change them.
+
+The Predictor Matrix informs us which variables are going to be used to predict a plausible value for variables (1 means a variable is used to predict another variable, 0 otherwise). Since no variable can predict itself, the intersection of one variable with itself in the matrix takes the value 0. We can manually determine if we would like to leave certain variables out of prediction. In this case, we will leave out the risk score which is based on other variables in this survey. 
+
+The *mice* package assumes a distribution for each variable and imputes missing variables according to that distribution. Hence, it is important to correctly specify each of these distributions. *mice* automatically chooses distributions for variables. If we would like to change them, we can do it by changing the methods’ characteristics.
+
+Based on the strong linear relationship between significant vartiables a simple predictive mean matching model will be used, with a manual correction for one-way prediction between total debt and drinking water debt, to avoid circularity.
+```{r}
+ini <- mice(larges.simple, maxit=0, print=F)
+meth<- ini$meth
+pred <- ini$pred
+pred[c("log.dollars_del_acc_TotR"), "log.dollars_del_dw_TotR"] <- 0 #exclude drinking water debt as a predictor of total debt to avoid circularity
+meth["log.dollars_del_dw_TotR"]<- "~ I(log.dollars_del_acc_TotR)" #define predictor for drinking water debt
+passive.imp <- mice(larges.simple, meth=meth, pred=pred, maxit=10, seed=123, print=F)
+plot(passive.imp)
+```
+
+The *mice()* function implements an iterative Markov Chain Monte Carlo type of algorithm. The plots above show the mean(left) and standard deviation(right) of the imputed values. In general, we would like the streams to intermingle and be free of any trends at the later iterations.
+
+Let's run further diagnostics. Generally, one would prefer for the imputed data to be plausible values, i.e. values that could have been observed if they had not been missing. In order to form an idea about plausibility, one may check the imputations and compare them against the observed values. If we are willing to assume that the data are missing completely at random (MCAR), then the imputations should have the same distribution as the observed data. In general, distributions may be different because the missing data are MAR (or even MNAR). However, very large discrepancies need to be screened. Observed and imputed data are plotted below.
+
+```{r}
+densityplot(passive.imp)
+```
+This method was accurate for imputed deqlinquent drinking water debt, but was very poor for other parameters. A mixed model may perform better.
+
+Bayesian linear regression will be tested as an imputation method.
+```{r}
+normpredict.imp <- mice(larges.simple, meth="norm.predict", pred=pred, maxit=10, seed=123, print=F)
+plot(normpredict.imp)
+```
+Bayesian linear regression causes extreme convergence, as the model is quite simple.
+
+```{r}
+densityplot(normpredict.imp)#, ~log.dollars_del_dw_TotR)
+```
+
+Bayesian linear regression performs quite poorly for predicting total debt. A random forest model may perform better.
+
+```{r}
+rf.imp <- mice(larges.simple, meth="rf", pred=pred, maxit=10, seed=123, print=F)
+plot(rf.imp)
+```
+Bayesian linear regression causes extreme convergence, as the model is quite simple.
+
+```{r}
+densityplot(rf.imp)#, ~log.dollars_del_dw_TotR)
+```
+Random forest modeling seems to have improved the prediction of drinking water debt, and seems to have smoothed.
+
+Observed data is plotted in blue, and imputed is in red. The figure graphs the data values of chl before and after imputation. The figure indicates that the distributions of the imputed and the observed values are similar. 
+Finally, we need to run the regression on each of the 40 datasets and pool the estimates together to get average regression coefficients and correct standard errors. The *with* function in the *mice* package allows us to do this.
+```{r}
+#First, turn the datasets into long format
+larges.simple_long <- mice::complete(rf.imp, action="long", include = TRUE)
+
+# #provide integer tag for voluntary status
+# allSmalls.simple_long %<>% 
+#   mutate(volunteered = case_when(voluntary == "y" ~ 1,voluntary == "n" ~ 0))
+#provide integer tag for loan status
+
+# Convert back to mids type - mice can work with this type
+larges.simple_long_mids <- as.mids(larges.simple_long)
+# Regression 
+
+fitimp <- with(larges.simple_long_mids,
+  lm(log.dollars_del_dw_TotR ~ Service_Connections +  Median_12month_HH_income + Fee_Code + Population +
+               Median_rent_pct_income + num_del_acc_plan + log.dollars_del_acc_TotR,
+     na.action = na.omit, data = larges))
+
+summary(pool(fitimp))
+```
+We can compare the pooled coefficients and p-values from the imputed datasets to see if any trends are altered (either become more pronounced or less). They should be similiar to the listwise-deletion technique.
+
+Let's look at the fmi and lambda. These should be quite low for a good model. 
+```{r}
+pool(fitimp)
+```
+We can see that these values are very low. Let's compare to the default model.
+```{r}
+#First, turn the datasets into long format
+larges.simple_long_1 <- mice::complete(normpredict.imp, action="long", include = TRUE)
+
+# #provide integer tag for voluntary status
+# allSmalls.simple_long %<>% 
+#   mutate(volunteered = case_when(voluntary == "y" ~ 1,voluntary == "n" ~ 0))
+#provide integer tag for loan status
+
+# Convert back to mids type - mice can work with this type
+larges.simple_long_mids_1 <- as.mids(larges.simple_long_1)
+# Regression 
+
+fitimp_1 <- with(larges.simple_long_mids_1,
+  lm(log.dollars_del_dw_TotR ~ Service_Connections +  Median_12month_HH_income + Fee_Code + Population +
+               Median_rent_pct_income + num_del_acc_plan + log.dollars_del_acc_TotR,
+     na.action = na.omit, data = larges))
+
+summary(pool(fitimp_1))
+```
+```{r}
+pool(fitimp_1)
+```
+These two models differ dramatically, with the Bayesian linear regression having significantly lower variance due to nonrsesponse (lambdi) and fraction of information missing due to nonresponse (fmi), with a strong linear relationship retained between total delinquent debt and drinking water debt.
+
+
+Let's further compare the Bayesian linear regression and random forest methods for log.dollars_del_acc_TotR. 
+```{r}
+log.dollars_del_acc_TotR <- c(complete(passive.imp)$log.dollars_del_acc_TotR, complete(passive.imp)$log.dollars_del_acc_TotR)
+method <- rep(c("norm.predict", "rf"), each = nrow(larges.simple))
+log.dollars_del_acc_TotR_m <- data.frame(log.dollars_del_acc_TotR = log.dollars_del_acc_TotR, method = method)
+#plot histogram
+histogram( ~log.dollars_del_acc_TotR | method, data = log.dollars_del_acc_TotR_m, nint = 25)
+```
+Here we see that these two method do not seemingly differ in prediction. Since the random forest performed better for the total  water debt, and performed approximately the same for drinking water debt, we will use the random forest.
+
+Now that we are satisfied with the selected imputed variables for dataset, let's extract the completed data and confirm that there are no additional missing values. 
+```{r}
+#extract the meaningful parameters
+larges.simple.imputed <- complete(rf.imp) %>% select(PWSID, log.dollars_del_acc_TotR, log.dollars_del_dw_TotR, Median_12month_HH_income, Service_Connections, num_del_acc_plan)
+#the imputed data can also be extracted in long format.
+#c.long <- complete(imp, "long")  
+md.pattern(larges.simple.imputed)
+```
+Here we can see that all data is completed.
+
+We can also compare summary statistics for the imputed variables with those in the original dataset.
+```{r}
+larges.simple.imputed %>% 
+  mutate(Grp = "Imputed") %>%
+  bind_rows(mutate(larges, Grp = "Original"))  %>%
+  select(Grp, log.dollars_del_acc_TotR, log.dollars_del_dw_TotR, 
+         Median_12month_HH_income, Service_Connections, num_del_acc_plan) %>%
+  group_by(Grp) %>% 
+  drop_na() %>% 
+  summarize_all(list(mean = "mean", median = "median", sd = "sd"))
+```
+Summary stats are not significantly altered. The mean and median number of service connections and number of deliquent account plans are beyond 10% different. Since service connections is an auxiliary variable this will be dropped from the imputed dataset. Imputation was not optimized for count data (number of delinquent accounts), and will not be used. Summary stats can be plotted.
+```{r}
+require(reshape2)
+#join data for plotting
+larges.simple.imputed %>% 
+  mutate(Grp = "Imputed") %>%
+  bind_rows(mutate(larges, Grp = "Original"))  %>%
+  select(Grp, log.dollars_del_acc_TotR, log.dollars_del_dw_TotR, 
+         Median_12month_HH_income, Service_Connections, num_del_acc_plan) %>%
+  melt() %>% #transforms values and variables to long format
+  ggplot(aes(x = variable, y = log10(value))) +
+  geom_boxplot(aes(fill = Grp))+
+  geom_jitter(aes(color = Grp), alpha = 0.3)
+```
+We can see that imputation has not noticeably changed the summary statistics of these data. We shall now fill in the dataset with these imputed values. 
+
+```{r join imputed data,results= 'hide'}
+#join data with imputed values to rest of dataset, providing imputed tag.
+larges.imputed.subset <- larges.simple.imputed %>% 
+  mutate(dollars_del_acc_TotR.imputed = 10 ^ log.dollars_del_acc_TotR,
+         dollars_del_dw_TotR.imputed = 10 ^ log.dollars_del_dw_TotR,
+         Median_12month_HH_income.imputed = Median_12month_HH_income) %>% 
+  select(PWSID, dollars_del_acc_TotR.imputed, dollars_del_dw_TotR.imputed, Median_12month_HH_income.imputed)
+
+allLarges <- right_join(larges.imputed.subset, allLarges, by = "PWSID")#join
+
+rm(larges.imputed.subset)
+rm(larges.simple.imputed)
+rm(larges.simple_long)
+rm(larges.simple_long_1)
+rm(allSmalls.rest)
+rm(imp)
+rm(imp2)
+rm(fitols)
+rm(fitimp)
+rm(fitimp_1)
+rm(ini)
+
+#visualize remaining missing values
+md.pattern(larges)
 ```
 Note that some variables are still missing, however these were deliberately not imputed either due to no being applicable (such as binned data) or would were calculated from other variables. 
 
@@ -2167,11 +2447,17 @@ allLarges %>%
   geom_histogram()
 ```
 ```{r}
+require(wesanderson)
 allLarges %>% 
   ggplot(aes(x = log10(Median_12month_HH_income), fill = responded)) +
- # geom_histogram(bins = 15) +
-  geom_density(alpha = 0.6)+
-  scale_fill_viridis_d()
+  geom_density(alpha = 0.5)+
+   scale_fill_manual(values = wes_palette("GrandBudapest1"),
+                     name = "Sampled",
+                     labels = c("Population", "Sampled")) +
+  xlab("Median 12-month Houshold Income (log10)") +
+  labs(title = "Distribution of Systems by Median Household Income",
+       subtitle = "<10,000 Service Connections") +
+  theme_minimal()
 ```
 Natural breaks of service connections and median 12-month household income are determined using the Jenk's method.
 ```{r}
@@ -2370,24 +2656,64 @@ svytotal(~dollars_del_acc_TotR, srv.dsgn.unadjusted.larges, na.rm = TRUE)
 ```
 Post-stratification by service connections and median household income using Jenk's Natural Breaks decreased the variance in estimates of statewide large water system delinquent accounts by a factor of 38.97 times! Further, weight adjustment using non-response propensity and calibration decreased the statewide estimate of debt by a factor of 1.56, or 156%. These values are visualized below.
 ```{r}
+### Do for non-imputed ###
+
 #totals for no weights
-del_dollars_larges_unweighted <- data.frame(svytotal(~dollars_del_acc_TotR, srv.dsgn.unweighted.larges, na.rm = TRUE)) %>% mutate(calibration = "Unweighted")
+del_dollars_larges_unweighted <- data.frame(svytotal(~dollars_del_acc_TotR, srv.dsgn.unweighted.larges, na.rm = TRUE)) %>% 
+  mutate(calibration = "Unweighted") %>% 
+  mutate(imputed = "non-imputed")
 
 #totals for unadjusted weights (base weights)
-del_dollars_larges_unadjusted <- data.frame(svytotal(~dollars_del_acc_TotR, srv.dsgn.unadjusted.larges, na.rm = TRUE)) %>%  mutate(calibration = "Base Weights")
+del_dollars_larges_unadjusted <- data.frame(svytotal(~dollars_del_acc_TotR, srv.dsgn.unadjusted.larges, na.rm = TRUE)) %>%  
+  mutate(calibration = "Base Weights") %>% 
+  mutate(imputed = "non-imputed")
 
 #totals for unadjusted weights (response propensity)
-del_dollars_larges_adjusted <- data.frame(svytotal(~dollars_del_acc_TotR, srv.dsgn.adjusted.larges, na.rm = TRUE)) %>%  mutate(calibration = "Non-response Adjusted")
+del_dollars_larges_adjusted <- data.frame(svytotal(~dollars_del_acc_TotR, srv.dsgn.adjusted.larges, na.rm = TRUE)) %>%  
+  mutate(calibration = "Non-response Adjusted") %>% 
+  mutate(imputed = "non-imputed")
 
 #totals for adjusted weights (calibration)
-del_dollars_larges_calibrated_fee <- data.frame(svytotal(~dollars_del_acc_TotR, ps.dsgn.fee.code.SC, na.rm = TRUE)) %>% mutate(calibration = "Calibrated (Conn. & Fee Code)")
+del_dollars_larges_calibrated_fee <- data.frame(svytotal(~dollars_del_acc_TotR, ps.dsgn.fee.code.SC, na.rm = TRUE)) %>% 
+  mutate(calibration = "Calibrated (Conn. & Fee Code)") %>% 
+  mutate(imputed = "non-imputed")
 
 #totals for adjusted weights (calibration)
-del_dollars_larges_calibrated <- data.frame(svytotal(~dollars_del_acc_TotR, ps.dsgn.larges, na.rm = TRUE)) %>% mutate(calibration = "Calibrated (Conn. & Income)")
+del_dollars_larges_calibrated <- data.frame(svytotal(~dollars_del_acc_TotR, ps.dsgn.larges, na.rm = TRUE)) %>%
+  mutate(calibration = "Calibrated (Conn. & Income)") %>% 
+  mutate(imputed = "non-imputed")
+
+#### Do for imputed ####
+#totals for no weights
+del_dollars_larges_unweighted_imputed <- data.frame(svytotal(~dollars_del_acc_TotR.imputed, srv.dsgn.unweighted.larges, na.rm = TRUE)) %>% 
+  mutate(calibration = "Unweighted") %>% 
+  mutate(imputed = "imputed")%>% 
+  rename(c("dollars_del_acc_TotR" = dollars_del_acc_TotR.imputed))
+
+#totals for unadjusted weights (base weights)
+del_dollars_larges_unadjusted_imputed <- data.frame(svytotal(~dollars_del_acc_TotR.imputed, srv.dsgn.unadjusted.larges, na.rm = TRUE)) %>%  mutate(calibration = "Base Weights") %>% 
+  mutate(imputed = "imputed")%>% 
+  rename(c("dollars_del_acc_TotR" = dollars_del_acc_TotR.imputed))
+
+#totals for unadjusted weights (response propensity)
+del_dollars_larges_adjusted_imputed <- data.frame(svytotal(~dollars_del_acc_TotR.imputed, srv.dsgn.adjusted.larges, na.rm = TRUE)) %>%  mutate(calibration = "Non-response Adjusted") %>% 
+  mutate(imputed = "imputed")%>% 
+  rename(c("dollars_del_acc_TotR" = dollars_del_acc_TotR.imputed))
+
+#totals for adjusted weights (calibration)
+del_dollars_larges_calibrated_fee_imputed <- data.frame(svytotal(~dollars_del_acc_TotR.imputed, ps.dsgn.fee.code.SC, na.rm = TRUE)) %>% mutate(calibration = "Calibrated (Conn. & Fee Code)") %>% 
+  mutate(imputed = "imputed")%>% 
+  rename(c("dollars_del_acc_TotR" = dollars_del_acc_TotR.imputed))
+
+#totals for adjusted weights (calibration)
+del_dollars_larges_calibrated_imputed <- data.frame(svytotal(~dollars_del_acc_TotR.imputed, ps.dsgn.larges, na.rm = TRUE)) %>% mutate(calibration = "Calibrated (Conn. & Income)") %>% 
+  mutate(imputed = "imputed") %>% 
+  rename(c("dollars_del_acc_TotR" = dollars_del_acc_TotR.imputed))
 
 #join dataframes
 del_dollars_Larges_c1 <- rbind(del_dollars_larges_unweighted, 
-del_dollars_larges_unadjusted, del_dollars_larges_adjusted, del_dollars_larges_calibrated_fee, del_dollars_larges_calibrated)
+del_dollars_larges_unadjusted, del_dollars_larges_adjusted, del_dollars_larges_calibrated_fee, del_dollars_larges_calibrated, del_dollars_larges_unweighted_imputed, 
+del_dollars_larges_unadjusted_imputed, del_dollars_larges_adjusted_imputed, del_dollars_larges_calibrated_fee_imputed, del_dollars_larges_calibrated_imputed)
 
 #add error bars
 del_dollars_Larges_comparison <- mutate(del_dollars_Larges_c1,
@@ -2395,23 +2721,24 @@ del_dollars_Larges_comparison <- mutate(del_dollars_Larges_c1,
                                 upper = total + 1.96*dollars_del_acc_TotR) %>%  #95% CI
   mutate_if(is.character, as.factor)
 
-
+require(wesanderson)
 #Construct a barplot
 del_dollars_Larges_comparison %>% 
   mutate(calibration = fct_relevel(calibration,
                                    "Unweighted", "Base Weights", "Non-response Adjusted", "Calibrated (Conn. & Fee Code)", "Calibrated (Conn. & Income)")) %>% #manually reorder by calibration status
 ggplot(aes(x = calibration, y = total, 
-                     ymin = lower, ymax = upper, fill = calibration)) +
-  geom_col() +
-  scale_fill_viridis_d(option = "B", alpha = 0.9) +
-  scale_x_discrete(name = "Weight Calibration")+
-  scale_y_continuous(labels = scales::dollar_format()) +
-  labs(y = "Total Estimated Delinquent Amount in Dollars") +
-  geom_errorbar(width = 0.9) +
+                     ymin = lower, ymax = upper, fill = imputed)) +
+  geom_col(position = "dodge") +
+    scale_x_discrete(name = "Weight Calibration")+
+  scale_fill_manual(values = wes_palette("Darjeeling1"),
+                    name = "Imputation") +
+  scale_y_continuous(labels = scales::label_number_si()) +
+  labs(y = "Total Estimated Delinquent Amount ($USD)") +
+  geom_errorbar(width = 0.9, position = "dodge") +
   labs(title = "Systems >10,000 Service Connections (n = 150 out of 223)",
        subtitle = "(Error Bars = 95% Confidence Intervals)") +
   theme_minimal() +
-  theme(legend.position = "none",
+  theme(
         legend.box.background = element_rect(color = "black"),
         legend.title = element_text(size = 14),
         legend.text = element_text(size = 12),
