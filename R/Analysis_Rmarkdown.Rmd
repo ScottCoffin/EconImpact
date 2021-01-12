@@ -772,7 +772,7 @@ Here we see that passive multiple imputation and the Classification and regressi
 Now that we are satisfied with the selected imputed variables for dataset, let's extract the completed data and confirm that there are no additional missing values. 
 ```{r}
 #extract the third imputed data set
-simpleImputed <- complete(imp) %>% select(-CES_3.0_Score, -Median_12month_HH_income, -months_before_assist, -Service_Connections)
+simpleImputed <- complete(imp) 
 #the imputed data can also be extracted in long format.
 #c.long <- complete(imp, "long")  
 md.pattern(simpleImputed)
@@ -809,10 +809,18 @@ smalls.imputed.subset <- simpleImputed %>%
          delinquent_num_acc.imputed = delinquent_num_acc,
          delinquent_amount_dollars.imputed = delinquent_amount_dollars,
          revenue_2020_Total.imputed = revenue_2020_Total,
-         revenue_2019_Total.imputed = revenue_2019_Total)
+         revenue_2019_Total.imputed = revenue_2019_Total,
+         Median_12month_HH_income.imputed = Median_12month_HH_income,
+         CES_3.0_Score.imputed = CES_3.0_Score,
+         months_before_assist.imputed = months_before_assist)
   
 #join data with imputed values to rest of dataset
 allSmalls <- right_join(smalls.imputed.subset, allSmalls, by = "PWSID") 
+
+# Make subset for weights and other analyses
+allSmalls.requested.responded <- allSmalls %>% 
+  filter(requested == "y" & responded == "y")
+
 #also split the dataset that has requested but no response data, which we will only use to adjust weights in the next section
 allSmalls.requested.voluntary.rest <- allSmalls.requested.voluntary %>% 
   select(-cash_reserve_total, -delinquent_num_acc, -delinquent_amount_dollars, -revenue_2020_Total, -revenue_2019_Total)
@@ -820,20 +828,20 @@ allSmalls.requested.voluntary.rest <- allSmalls.requested.voluntary %>%
 imputedSmalls.requested.voluntary <- right_join(simpleImputed, allSmalls.requested.voluntary.rest, by = "PWSID")
 
 #remove
-rm(allSmalls.requested.voluntary.rest)
-rm(allSmalls.rest)
-rm(imp)
-rm(imp2)
-rm(fitols)
-rm(allSmalls.simple2)
-rm(allSmalls.simple_long)
-rm(allSmalls.simple_long_1)
-rm(allSmalls.simple_long_mids)
-rm(allSmalls.simple_long_mids_1)
-rm(fitimp)
-rm(fitimp_1)
-rm(ini)
-rm(CES_3.0_Score_m)
+# rm(allSmalls.requested.voluntary.rest)
+# rm(allSmalls.rest)
+# rm(imp)
+# rm(imp2)
+# rm(fitols)
+# rm(allSmalls.simple2)
+# rm(allSmalls.simple_long)
+# rm(allSmalls.simple_long_1)
+# rm(allSmalls.simple_long_mids)
+# rm(allSmalls.simple_long_mids_1)
+# rm(fitimp)
+# rm(fitimp_1)
+# rm(ini)
+# rm(CES_3.0_Score_m)
 #visualize remaining missing values
 md.pattern(imputedSmalls)
 ```
@@ -2019,10 +2027,61 @@ Here we can see the strong linear relationship between cash total and service co
 #### Small Systems
 The code below uses the *sampling* package to select a sample with probability proportional to the median 12 month household income . The method of selection is to randomize the order of the population and then select a systematic sample (see Hartley and Rao 1962).
 
+The discrete breaks for median 12-month household income, calculated using the Jenk's Natural Breaks method, are below.
+<!-- # ```{r} -->
+<!-- # #### Natural Breaks #### -->
+<!-- # #Determine natural breaks and assign -->
+<!-- # breaks_income_smalls <- getJenksBreaks(allSmalls$Median_12month_HH_income, 4) -->
+<!-- # -->
+<!-- # #specify bin labels -->
+<!-- # postStrata_income_smalls <- c("A", "B", "C")#, "D")#, "E", "F")#, "G", "H", "I") -->
+<!-- # -->
+<!-- # #bucket values into bins -->
+<!-- # bins <- cut(allSmalls$Median_12month_HH_income, -->
+<!-- #             breaks = breaks_income_smalls, -->
+<!-- #             include.lowest = TRUE, -->
+<!-- #             right = FALSE, -->
+<!-- #             labels = postStrata_income_smalls) -->
+<!-- # -->
+<!-- # #inspect bins -->
+<!-- # summary(bins) -->
+<!-- # ``` -->
+<!-- # A summary of the number of systems in each bin  (by median 12-month household income) is shown above. -->
+<!-- # ```{r} -->
+<!-- # #Store group as new column -->
+<!-- # allLarges <-as_tibble(allLarges) %>%  -->
+<!-- #   mutate(postStrata_income = case_when( -->
+<!-- #     Median_12month_HH_income >= breaks[1] & Median_12month_HH_income < breaks[2] ~postStrata_income[1], -->
+<!-- #     Median_12month_HH_income >= breaks[2] & Median_12month_HH_income < breaks[3] ~postStrata_income[2], -->
+<!-- #     Median_12month_HH_income >= breaks[3] & Median_12month_HH_income <= breaks[4] ~postStrata_income[3], -->
+<!-- #   )) -->
+<!-- #  -->
+<!-- # #replace missing value with median (B) -->
+<!-- # allLarges$postStrata_income %<>%  -->
+<!-- #   replace_na("B") -->
+<!-- #  -->
+<!-- # #tag is character vector, so convert to factor -->
+<!-- # allLarges$postStrata_income <- factor(allLarges$postStrata_income, -->
+<!-- #                     ordered = FALSE) -->
+<!-- # breaks -->
+<!-- # ### TOO MANY NA'S. MUST IMPUTE. ### -->
+<!-- # ``` -->
+The discrete breaks for the three bins of income are displayed above (in US dollars). 
+
+Before calibration, non-response-adjusted weights will be examined for completeness.
+
+```{r}
+#examine adjusted weights
+summary(allSmalls.requested.responded$final.weight.nonresponse)
+```
+
+There are no missing adjusted weights, calibration may proceed.
+
 ```{r}
 require(survey)
 #get population totals for items of interest
 N.PS <- xtabs(~Fee_Code, data = allSmalls)
+
 
 #build survey design with no weights
 srv.dsgn.unweighted <- svydesign(ids = ~0,
@@ -2426,8 +2485,6 @@ allSmalls.requested.responded <- cbind(allSmalls.requested.responded, weights(ps
 #bind post-stratified weights to imputed survey with volunteers
 imputedSmalls.survey_final <- cbind(imputedSmalls.survey, weights(ps.dsgn.imputed.volunteers))
 
-allSmalls.imputed <- cbind()
-
 tmp <- imputedSmalls.survey_final %>% 
   rename(c("final.weight" = 'weights(ps.dsgn.imputed.volunteers)')) %>% 
   select(-c(unwt.rr, wt.rr.final, unwt.rr.final, final.weight.nonresponse, final.weight.nonresponse.unwt))
@@ -2438,10 +2495,13 @@ tmp3 <- tmp2 %>%
   select(-c(wt.rr, unwt.rr, wt.rr.final, unwt.rr.final, sum.base.weight))
 
 ####FINAL###
-# write.csv(tmp3,
-#           file = "Datasets/smallSurvey_full_IMPUTED.csv")
+write.csv(tmp3,
+           file = "Datasets/smallSurvey_full_IMPUTED.csv")
 ############
 
+#full dataset with imputed values (labeled) and final weights
+write.csv(allSmalls,
+          file = "Datasets/smallSurvey_population_IMPUTED.csv")
 
 #Save to csv
 # write.csv(x = allSmalls.requested.responded %>% 
@@ -3097,10 +3157,23 @@ Now that we have our adjusted weights and a complete (imputed) dataset, it's tim
 ## Small Systems (>10,000 Service Connections)
 
 ```{r}
+#include imputed data and volunteers, but only samples in survey
+allSmalls.complete <-tmp3 %>% 
+  filter(responded == "y")
+#design survey object
+smalls.dsgn <- svydesign(data = allSmalls.complete, 
+                        weights = ~final.weight, #if weighted. Don't forget tilde ~
+                        fpc = ~fpc, #population size for each stratum
+                        strata = ~tag + Fee_Code, #bins and post-stratified fee code
+                        id = ~1) #specifies independent sampling (without replacement)
+```
+
+
+```{r}
 #smalls
 del_dollars_smalls <- svyby(~delinquent_amount_dollars, 
          by = ~Fee_Code, 
-         design = ps.dsgn,
+         design = smalls.dsgn,
       FUN = svytotal,
          na.rm = TRUE)
 del_dollars_smalls
@@ -3138,7 +3211,156 @@ ggplot(aes(x = Fee_Code, y = delinquent_amount_dollars,
         plot.subtitle = element_text(hjust = 0.5))
 ```
 
-Above is for smalls. Below is for larges for total dollars of delinquent accouts (including other expenses such as power).
+
+
+```{r}
+# # Create a segmented bar graph of the conditional proportions in table
+# p1 <- ggplot(data = tab_debt_cond_lrg,
+#        mapping = aes(x = Fee_Code, y = Prop_Need)) + 
+#   geom_col() + 
+#   coord_flip() +
+#   labs(title = "Total Debt (Post-Stratifed)",
+#        xlab = "Proportion")
+# #before strat
+# p2 <- ggplot(data = tab_debt_cond__lrg_unwt,
+#        mapping = aes(x = Fee_Code, y = Prop_Need)) + 
+#   geom_col() + 
+#   coord_flip() +
+#   labs(title = "Total Debt (unadjusted weights)",
+#        xlab = "Proportion")
+# 
+# grid.arrange(p1, p2)
+```
+
+Let's ask what the mean cash reserve total is for each of the strata. The mean for each bin is interpreted as the proportion for each category.
+
+### Risk
+
+Calculated risk score (derived by **Marielle**), is calculated and plotted below for small systems.
+Totals can be visualized graphically.
+
+```{r}
+# construct and display a frequency table STRATIFIED
+tab_tag_risk_cond <-  svytable(~tag + Risk_label,
+                         design = smalls.dsgn) %>% 
+  # Add conditional proportions to table
+    as.data.frame() %>%
+    group_by(tag) %>%
+    mutate(n_tag = sum(Freq), Prop_Risk = Freq/n_tag) %>%
+    ungroup()
+
+# Create a segmented bar graph of the conditional proportions in table
+tab_tag_risk_cond %>% 
+ggplot(aes(x = Risk_label, y = Freq, fill = tag)) + 
+  geom_col(position = position_stack(reverse = TRUE)) + 
+  labs(title = " Risk (Statewide Estimate)",
+       subtitle = "(<10,000 Service Connections)",
+       caption = "Strata defined by service connections. Post-stratified by fee code") +
+  xlab("Risk") +
+  ylab("Estimate") +
+  scale_fill_manual(values = wes_palette("Moonrise2"),
+                    name = "Strata") +
+  theme_minimal() +
+  theme(legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+```
+ 
+ These data can also be viewed by fee code. 
+ 
+```{r}
+# construct and display a frequency table STRATIFIED
+tab_feeCode_risk_cond <-  svytable(~Fee_Code + Risk_label,
+                         design = smalls.dsgn) %>% 
+  # Add conditional proportions to table
+    as.data.frame() %>%
+    group_by(Fee_Code) %>%
+    mutate(n_tag = sum(Freq), Prop_Risk = Freq/n_tag) %>%
+    ungroup()
+
+# Create a segmented bar graph of the conditional proportions in table
+tab_feeCode_risk_cond %>% 
+ggplot(aes(x = Risk_label, y = Freq, fill = Fee_Code)) + 
+  geom_col(position = position_stack(reverse = TRUE)) + 
+  labs(title = " Risk (Statewide Estimate)",
+       subtitle = "(<10,000 Service Connections)",
+       caption = "Strata defined by service connections. Post-stratified by fee code") +
+  xlab("Risk") +
+  ylab("Estimate") +
+  scale_fill_manual(values = wes_palette("Darjeeling1"),
+                    name = "Fee Code") +
+  theme_minimal() +
+  theme(legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+```
+
+These data are reported with error bars (not grouped) below. 
+
+```{r}
+tab_risk <- svytotal(~Risk_label, 
+         design = smalls.dsgn,
+         na.rm = TRUE) %>% 
+  data.frame()
+#reassign names
+tab_risk <- set_rownames(tab_risk,
+                         c("Extreme", "High", "Low", "Medium", "Medium High", "Very Low"))
+#convert rownames to column
+tab_risk %<>% 
+  rownames_to_column("Risk")
+
+#add lower and upper columns
+tab_risk_smalls <- mutate(tab_risk,
+                                 lower = total - 1.96 * SE, #95% CI
+                                upper = total + 1.96 * SE) %>% 
+  mutate_if(is.character, as.factor) %>% 
+  mutate(Risk = fct_relevel(Risk,
+                            "Very Low", "Low", "Medium", "Medium High", "High", "Extreme"))
+
+#Construct a barplot
+require(calecopal)
+tab_risk_smalls %>% 
+ggplot(aes(x = Risk, y = total, 
+                     ymin = lower, ymax = upper, fill = Risk)) +
+  geom_col() + 
+  geom_errorbar(width = 0.7) +
+  geom_text(aes(label = round(total)),
+            vjust = -4) +
+  labs(title = " Risk (Statewide Estimate)",
+       subtitle = "(<10,000 Service Connections)",
+       caption = "Strata defined by service connections. Post-stratified by fee code") +
+  xlab("Estimated Financial Risk") +
+  ylab("Estimated Number of Systems") +
+  scale_y_continuous(limits = c(0,1000))+
+  scale_fill_manual(values = rev(cal_palette("kelp1")), #reverse color order
+                    name = "Strata") +
+  theme_minimal() +
+  theme(legend.position = "none",
+    legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+    plot.caption = element_text(size = 8))
+```
+ 
+ 
+
+```{r summary statistics}
+# svymean(~cash_reserve_total + tag, dclus1)
+```
+
+
+## Large Systems (>10,000 Service Connections)
+
+Below is for larges for total dollars of delinquent accouts (including other expenses such as power).
 ```{r}
 #larges
 dollars_del_acc_TotR <- svyby(~dollars_del_acc_TotR, 
@@ -3162,7 +3384,7 @@ dollars_del_acc_TotRs_col <- mutate(dollars_del_acc_TotR,
 dollars_del_acc_TotRs_col %>% 
 ggplot(aes(x = Fee_Code, y = dollars_del_acc_TotR, 
                      ymin = lower, ymax = upper, fill = Fee_Code)) +
-  geom_col() +
+  geom_col(position = "identity") +
   scale_fill_viridis_d() +
   scale_x_discrete(name = "Fee Code", 
                     labels = c("Large", 
@@ -3172,7 +3394,8 @@ ggplot(aes(x = Fee_Code, y = dollars_del_acc_TotR,
   labs(y = "Total Estimated Delinquent Amount in Dollars") +
   geom_errorbar(width = 0.7) +
   labs(title = "Systems >10,000 Service Connections",
-       subtitle = "95 Confidence Interval") +
+       subtitle = "(95 Confidence Interval)",
+       caption = "Post-stratified by service connections and median household income") +
   theme_minimal() +
   theme(legend.position = "none",
         legend.box.background = element_rect(color = "black"),
@@ -3212,20 +3435,65 @@ Above is totals for smalls. 57,595,916 +- 2,470,236.
 Below is for larges (all expenses)
 ```{r}
 #larges
-svytotal(~dollars_del_acc_TotR, 
+debt.total <- svytotal(~dollars_del_acc_TotR, 
          design = ps.dsgn.larges,
-         na.rm = TRUE)
+         na.rm = TRUE) %>% 
+  data.frame() %>% 
+  mutate(Debt = "All Expenses") %>% 
+  rename(c("SE" = dollars_del_acc_TotR))
+debt.total
 ```
 And below for just drinking water expenses.
 
 ```{r}
 #larges
-svytotal(~dollars_del_dw_TotR, 
+dw.debt.total <- svytotal(~dollars_del_dw_TotR, 
          design = ps.dsgn.larges,
-         na.rm = TRUE)
+         na.rm = TRUE) %>% 
+  data.frame() %>% 
+  mutate(Debt = "Drinking Water Expenses") %>% 
+  rename(c("SE" = dollars_del_dw_TotR))
+dw.debt.total
 ```
-And for smalls.
 
+Totals are depicted graphically below.
+```{r}
+#join dataframes
+debt_larges <- rbind(dw.debt.total, debt.total)
+
+#add error bars
+debt_larges_comparison <- mutate(debt_larges,
+                                 lower = total - 1.96*SE, #95% CI
+                                upper = total + 1.96*SE) %>%  #95% CI
+  mutate(year = "2020")
+  mutate_if(is.character, as.factor)
+
+
+#Construct a barplot
+debt_larges_comparison %>% 
+ggplot(aes(x = Debt, y = total, 
+                     ymin = lower, ymax = upper, fill = Debt)) +
+  geom_col(position = "identity") +
+  scale_fill_manual(values = cal_palette("chaparral2"))+
+  scale_x_discrete(name = "Debt Type") +
+  scale_y_continuous(labels = scales::dollar_format(),
+                     limits = c(0,1000000000)) +
+  labs(y = "Statewide Estimated Debt ($USD)") +
+  geom_errorbar(width = 0.7) +
+  labs(title = "Systems >10,000 Service Connections",
+       subtitle = "(95 Confidence Interval)",
+       caption = "Post-stratified by service connections and median household income") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        legend.box.background = element_rect(color = "black"),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+
+```
 
 All of these data can be viewed as a table. 
 ```{r}
@@ -3245,36 +3513,6 @@ tab_debt_lrg_unweighted <- svyby(~dollars_del_dw_TotR,
     as.data.frame()
 
 ```
-
-```{r}
-# # Create a segmented bar graph of the conditional proportions in table
-# p1 <- ggplot(data = tab_debt_cond_lrg,
-#        mapping = aes(x = Fee_Code, y = Prop_Need)) + 
-#   geom_col() + 
-#   coord_flip() +
-#   labs(title = "Total Debt (Post-Stratifed)",
-#        xlab = "Proportion")
-# #before strat
-# p2 <- ggplot(data = tab_debt_cond__lrg_unwt,
-#        mapping = aes(x = Fee_Code, y = Prop_Need)) + 
-#   geom_col() + 
-#   coord_flip() +
-#   labs(title = "Total Debt (unadjusted weights)",
-#        xlab = "Proportion")
-# 
-# grid.arrange(p1, p2)
-```
-
-Let's ask what the mean cash reserve total is for each of the strata. The mean for each bin is interpreted as the proportion for each category.
-
-
-```{r summary statistics}
-# svymean(~cash_reserve_total + tag, dclus1)
-```
-
-
-## Large Systems (>10,000 Service Connections)
-
 
 
  7. What is the total amount of household water debt accumulated since the beginning of the COVID-19 emergency? [MODERATE, REQUIRES WEIGHTING, COMBINING WITH ALL SYSTEMS]
