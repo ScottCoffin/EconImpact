@@ -815,7 +815,7 @@ smalls.imputed.subset <- simpleImputed %>%
          months_before_assist.imputed = months_before_assist)
   
 #join data with imputed values to rest of dataset
-allSmalls <- right_join(smalls.imputed.subset, allSmalls, by = "PWSID") 
+allSmalls <- right_join(smalls.imputed.subset %>% select(-c(Service_Connections)), allSmalls, by = "PWSID") 
 
 # Make subset for weights and other analyses
 allSmalls.requested.responded <- allSmalls %>% 
@@ -823,9 +823,9 @@ allSmalls.requested.responded <- allSmalls %>%
 
 #also split the dataset that has requested but no response data, which we will only use to adjust weights in the next section
 allSmalls.requested.voluntary.rest <- allSmalls.requested.voluntary %>% 
-  select(-cash_reserve_total, -delinquent_num_acc, -delinquent_amount_dollars, -revenue_2020_Total, -revenue_2019_Total)
+  select(-cash_reserve_total, -delinquent_num_acc, -delinquent_amount_dollars, -revenue_2020_Total, -revenue_2019_Total, -CES_3.0_Score, -Median_12month_HH_income, -months_before_assist )
 #join
-imputedSmalls.requested.voluntary <- right_join(simpleImputed, allSmalls.requested.voluntary.rest, by = "PWSID")
+imputedSmalls.requested.voluntary <- right_join(simpleImputed %>%  select(-c(Service_Connections)), allSmalls.requested.voluntary.rest, by = "PWSID")
 
 #remove
 # rm(allSmalls.requested.voluntary.rest)
@@ -843,7 +843,7 @@ imputedSmalls.requested.voluntary <- right_join(simpleImputed, allSmalls.request
 # rm(ini)
 # rm(CES_3.0_Score_m)
 #visualize remaining missing values
-md.pattern(imputedSmalls)
+md.pattern(smalls.imputed.subset)
 ```
 Note that some variables are still missing, however these were deliberately not imputed either due to no being applicable (such as binned data) or would were calculated from other variables. 
 
@@ -1104,17 +1104,17 @@ larges.imputed.subset <- larges.simple.imputed %>%
 
 allLarges <- right_join(larges.imputed.subset, allLarges, by = "PWSID")#join
 
-rm(larges.imputed.subset)
-rm(larges.simple.imputed)
-rm(larges.simple_long)
-rm(larges.simple_long_1)
-rm(allSmalls.rest)
-rm(imp)
-rm(imp2)
-rm(fitols)
-rm(fitimp)
-rm(fitimp_1)
-rm(ini)
+# rm(larges.imputed.subset)
+# rm(larges.simple.imputed)
+# rm(larges.simple_long)
+# rm(larges.simple_long_1)
+# rm(allSmalls.rest)
+# rm(imp)
+# rm(imp2)
+# rm(fitols)
+# rm(fitimp)
+# rm(fitimp_1)
+# rm(ini)
 
 #visualize remaining missing values
 md.pattern(larges)
@@ -1275,25 +1275,24 @@ predicted.log %>% head()
 ```
 The above output shows the first six estimated response propensities of our dataset. Since we don't have pardata for all samples, we are now computing our predictor estimates from a subset of sampled units.
 
-Let's define our survey structure in the *survey* package. 
-```{r survey initiate, results='hide'}
-#join baseweights to imputed smalls
-imputedSmalls <- left_join(imputedSmalls, 
-                             allSmalls %>% select(PWSID, base.weight, fpc),
-                             by = "PWSID")
-##### Specify sampling design ####
-#here we will use our imputed survey dataset
-#(stratified)
-srv.dsgn <- svydesign(data = imputedSmalls, 
-                        weights = ~base.weight, #if weighted. Don't forget tilde ~
-                        fpc = ~fpc, #population size for each stratum
-                        strata = ~tag, #bins
-                        id = ~1) #specifies independent sampling (without replacement)
-#specify replicate survey design
-rclus1 <- as.svrepdesign(srv.dsgn)
-#print summary of design
-summary(srv.dsgn)
-```
+<!-- Let's define our survey structure in the *survey* package.  -->
+<!-- ```{r survey initiate, results='hide'} -->
+<!-- #join baseweights to smalls with -->
+
+
+<!-- ##### Specify sampling design #### -->
+<!-- #here we will use our imputed survey dataset -->
+<!-- #(stratified) -->
+<!-- srv.dsgn <- svydesign(data = imputedSmalls,  -->
+<!--                         weights = ~base.weight, #if weighted. Don't forget tilde ~ -->
+<!--                         fpc = ~fpc, #population size for each stratum -->
+<!--                         strata = ~tag, #bins -->
+<!--                         id = ~1) #specifies independent sampling (without replacement) -->
+<!-- #specify replicate survey design -->
+<!-- rclus1 <- as.svrepdesign(srv.dsgn) -->
+<!-- #print summary of design -->
+<!-- summary(srv.dsgn) -->
+<!-- ``` -->
 
 The package *PracTools* has tools to determine propensity classes. We will use service connections, population, fee code, and regulating agency as predictor variables.
 
@@ -1584,10 +1583,10 @@ We can see clearly that the high non-response in the smaller bins has inflated t
 
 Repeat these steps for the imputed data.
 ```{r}
-#join imputed smalls weights to imputed dataset
-imputedSmalls %<>%
-  left_join(imputedSmalls.requested.voluntary.NR %>% select(PWSID, wt.rr.final, unwt.rr, unwt.rr.final),
-            by = "PWSID")
+# #join imputed smalls weights to imputed dataset
+# imputedSmalls %<>%
+#   left_join(imputedSmalls.requested.voluntary.NR %>% select(PWSID, wt.rr.final, unwt.rr, unwt.rr.final),
+#             by = "PWSID")
 
 #join non-response weights to just the sample frame
 imputedSmalls.requested.voluntary %<>% 
@@ -1599,14 +1598,25 @@ imputedSmalls.requested.voluntary %<>%
   mutate(final.weight.nonresponse = wt.rr.final * base.weight) %>% 
   mutate(final.weight.nonresponse.unwt = unwt.rr.final * base.weight)
 
+#adjust to population manually
+imputedSmalls.requested.voluntary %<>% 
+  mutate(final.weight.nonresponse = case_when(tag == "Bin A" ~
+           final.weight.nonresponse / 1.707345,
+         tag == "Bin B" ~
+           final.weight.nonresponse / 1.449354,
+         tag == "Bin C" ~
+           final.weight.nonresponse / 1.21414,
+         tag == "Bin D" ~
+           final.weight.nonresponse / 1.199856)) #manual correction factor for population
+
+
 #view summary
 imputedSmalls.requested.voluntary %>% 
   select(tag, PWSID, base.weight, final.weight.nonresponse, final.weight.nonresponse.unwt, N, samples) %>% 
   group_by(tag) %>% 
   summarize(sum.final.weight = sum(final.weight.nonresponse), sum.final.weight.unwt.rr = sum(final.weight.nonresponse.unwt), totalSamples = max(samples), population = max(N), percent.diff = 100*(1 - sum.final.weight/(population)))
-
 ```
-We can see that the dataset that included the volunteers dramatically inflates the nonresponse-adjusted weights. This is an unnaceptable difference.
+The sum of adjusted weights now match the population.
 ```{r}
 rm(imputedSmalls.requested.voluntary.NR, allSmalls.requested.NR, chk1, chk2, crf.prob2, crfsrvy.prob2, crf.srvy.2, crf.prob, crf.srvy, crfsrvy.prob, fitResponse, allSmalls.requested.response.model, allSmalls.simple, baseWeights, completenessSummary, log.reg.m, out, probSumm, t1, t2, tab, tmp1, tmp2, transposed, x.matrix, rpart.prob, predM, MissingMatrix, scaledSumm, smalls, srv.dsgn, rclus1)
 ```
@@ -2844,7 +2854,71 @@ ggplot(aes(x = calibration, y = total,
         plot.title = element_text(hjust = 0.5),
         plot.subtitle = element_text(hjust = 0.5))
 ```
-The impact of weigthing (and adjusting weights using calibration) on both estimate totals and error can be seen above.
+The impact of weigthing (and adjusting weights using calibration) on both estimate totals and error can be seen above.A simpler figure is below.
+
+```{r}
+### Do for non-imputed ###
+
+#totals for no weights
+del_dollars_larges_unweighted <- data.frame(svytotal(~dollars_del_acc_TotR, srv.dsgn.unweighted.larges, na.rm = TRUE)) %>% 
+  mutate(calibration = "Unweighted") %>% 
+  mutate(imputed = "non-imputed")
+
+
+#totals for adjusted weights (calibration)
+del_dollars_larges_calibrated <- data.frame(svytotal(~dollars_del_acc_TotR, ps.dsgn.larges, na.rm = TRUE)) %>%
+  mutate(calibration = "Calibrated (Conn. & Income)") %>% 
+  mutate(imputed = "non-imputed")
+
+#### Do for imputed ####
+#totals for no weights
+del_dollars_larges_unweighted_imputed <- data.frame(svytotal(~dollars_del_acc_TotR.imputed, srv.dsgn.unweighted.larges, na.rm = TRUE)) %>% 
+  mutate(calibration = "Unweighted") %>% 
+  mutate(imputed = "imputed")%>% 
+  rename(c("dollars_del_acc_TotR" = dollars_del_acc_TotR.imputed))
+
+
+#totals for adjusted weights (calibration)
+del_dollars_larges_calibrated_imputed <- data.frame(svytotal(~dollars_del_acc_TotR.imputed, ps.dsgn.larges, na.rm = TRUE)) %>% mutate(calibration = "Calibrated (Conn. & Income)") %>% 
+  mutate(imputed = "imputed") %>% 
+  rename(c("dollars_del_acc_TotR" = dollars_del_acc_TotR.imputed))
+
+#join dataframes
+del_dollars_Larges_c1 <- rbind(del_dollars_larges_unweighted,  del_dollars_larges_calibrated, del_dollars_larges_unweighted_imputed, 
+del_dollars_larges_calibrated_imputed)
+
+#add error bars
+del_dollars_Larges_comparison <- mutate(del_dollars_Larges_c1,
+                                 lower = total - 1.96*dollars_del_acc_TotR, #95% CI
+                                upper = total + 1.96*dollars_del_acc_TotR) %>%  #95% CI
+  mutate_if(is.character, as.factor)
+
+require(wesanderson)
+#Construct a barplot
+del_dollars_Larges_comparison %>% 
+  mutate(calibration = fct_relevel(calibration,
+                                   "Unweighted", "Calibrated (Conn. & Income)")) %>% #manually reorder by calibration status
+ggplot(aes(x = calibration, y = total, 
+                     ymin = lower, ymax = upper, fill = imputed)) +
+  geom_col(position = "dodge") +
+    scale_x_discrete(name = "Weight Calibration")+
+  scale_fill_manual(values = wes_palette("Darjeeling1"),
+                    name = "Imputation") +
+  scale_y_continuous(labels = scales::label_number_si()) +
+  labs(y = "Total Estimated Delinquent Amount ($USD)") +
+  geom_errorbar(width = 0.9, position = "dodge") +
+  labs(title = "Systems >10,000 Service Connections (n = 150 out of 223)",
+       subtitle = "(Error Bars = 95% Confidence Intervals)") +
+  theme_minimal() +
+  theme(
+        legend.box.background = element_rect(color = "black"),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        axis.text = element_text(size = 10),
+        axis.title = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+```
 
 ```{r}
 # construct and display a frequency table STRATIFIED
@@ -3236,6 +3310,10 @@ Let's ask what the mean cash reserve total is for each of the strata. The mean f
 
 ### Risk
 
+Financial risk may be estimated in two distinct ways. A question in the survey regarding financial risk, asked as "how many months do you believe you'll be able to go without assistance?" provides qualitative *perception* based estimates of risk. An alternative approach was also employed, in which quantitative reported information (i.e. restricted and unrestricted cash reserves) was used to estimate financial risk under the conservative assumption that current unrestricted funds are all that are available, with no further income. Both risk estimates are reported below.
+
+#### Calculated Risk
+
 Calculated risk score (derived by **Marielle**), is calculated and plotted below for small systems.
 Totals can be visualized graphically.
 
@@ -3330,14 +3408,14 @@ ggplot(aes(x = Risk, y = total,
                      ymin = lower, ymax = upper, fill = Risk)) +
   geom_col() + 
   geom_errorbar(width = 0.7) +
-  geom_text(aes(label = round(total)),
-            vjust = -4) +
-  labs(title = " Risk (Statewide Estimate)",
+  geom_text(aes(label = paste0(paste0(round(total)," \u00B1 "),round(SE))),
+            vjust = -3) +
+  labs(title = "Financial Health Risk (Statewide Estimate)",
        subtitle = "(<10,000 Service Connections)",
        caption = "Strata defined by service connections. Post-stratified by fee code") +
-  xlab("Estimated Financial Risk") +
+  xlab("Estimated Financial Health Risk") +
   ylab("Estimated Number of Systems") +
-  scale_y_continuous(limits = c(0,1000))+
+  scale_y_continuous(limits = c(0,1500))+
   scale_fill_manual(values = rev(cal_palette("kelp1")), #reverse color order
                     name = "Strata") +
   theme_minimal() +
@@ -3351,10 +3429,201 @@ ggplot(aes(x = Risk, y = total,
     plot.caption = element_text(size = 8))
 ```
  
+#### *Perceived* Risk
+The perceived risk, reported by system interviewees in response to the question "how many months do you estimate that you will be able to go for needing finanical assistance?" with discrete responses labeled "A - F," corresponding the followingresponses:
+A: 0-3 months 
+B: 4-6 months 
+C: 7-9 months 
+D: 10-12 months 
+E: Greater than 12 months 
+F: No financial assistance anticipated
+
+
+```{r}
+# construct and display a frequency table STRATIFIED
+tab_tag_risk_cond <-  svytable(~tag + months_before_assist,
+                         design = smalls.dsgn) %>% 
+  # Add conditional proportions to table
+    as.data.frame() %>%
+    group_by(tag) %>%
+    mutate(n_tag = sum(Freq), Prop_Risk = Freq/n_tag) %>%
+    ungroup()
+
+# Create a segmented bar graph of the conditional proportions in table
+tab_tag_risk_cond %>% 
+ggplot(aes(x = months_before_assist, y = Freq, fill = tag)) + 
+  geom_col(position = position_stack(reverse = TRUE)) + 
+ # geom_text(aes(label = round(Freq)),
+  #          vjust = -4) +
+  labs(title = "Perceived Financial Risk (Statewide Estimate)",
+       subtitle = "(<10,000 Service Connections)",
+       caption = "Strata defined by service connections. Post-stratified by fee code") +
+  xlab("Perceived Financial Risk") +
+  ylab("Estimated Number of Systems") +
+  scale_fill_manual(values = wes_palette("Moonrise2"),
+                    name = "Strata") +
+  scale_x_discrete(name = "Perceived Months Before Assistance", 
+                    labels = c("0-3", 
+                               "4-6",
+                               "7-9", 
+                               "10-12",
+                               "> 12",
+                               "None anticipated")) +
+  theme_minimal() +
+  theme(legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+```
  
+ These data can also be viewed by fee code. 
+ 
+```{r}
+# construct and display a frequency table STRATIFIED
+tab_feeCode_risk_cond <-  svytable(~Fee_Code + months_before_assist,
+                         design = smalls.dsgn) %>% 
+  # Add conditional proportions to table
+    as.data.frame() %>%
+    group_by(Fee_Code) %>%
+    mutate(n_tag = sum(Freq), Prop_Risk = Freq/n_tag) %>%
+    ungroup()
+
+# Create a segmented bar graph of the conditional proportions in table
+tab_feeCode_risk_cond %>% 
+ggplot(aes(x = months_before_assist, y = Freq, fill = Fee_Code)) + 
+  geom_col(position = position_stack(reverse = TRUE)) + 
+  labs(title = "Perceived Financial Risk (Statewide Estimate)",
+       subtitle = "(<10,000 Service Connections)",
+       caption = "Strata defined by service connections. Post-stratified by fee code") +
+  xlab("Perceived Financial Risk") +
+  ylab("Estimated Number of Systems") +
+  scale_fill_manual(values = wes_palette("Darjeeling1"),
+                    name = "Fee Code") +
+  scale_x_discrete(name = "Perceived Months Before Assistance", 
+                    labels = c("0-3", 
+                               "4-6",
+                               "7-9", 
+                               "10-12",
+                               "> 12",
+                               "None anticipated")) +
+  theme_minimal() +
+  theme(legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+```
+
+These data are reported with error bars (not grouped) below. 
+
+```{r}
+tab_risk <- svytotal(~months_before_assist.imputed, 
+         design = smalls.dsgn,
+         na.rm = TRUE) %>% 
+  data.frame()
+#reassign names
+tab_risk <- set_rownames(tab_risk,
+                         c("0-3", 
+                               "4-6",
+                               "7-9", 
+                               "10-12",
+                               "> 12",
+                               "None anticipated"))
+
+
+#convert rownames to column
+tab_risk %<>% 
+  rownames_to_column("Risk")
+
+#add lower and upper columns
+tab_risk_smalls <- mutate(tab_risk,
+                                 lower = total - 1.96 * SE, #95% CI
+                                upper = total + 1.96 * SE) %>% 
+  mutate_if(is.character, as.factor) %>% 
+  mutate(Risk = fct_relevel(Risk,
+                            "0-3",
+                               "4-6",
+                               "7-9",
+                               "10-12",
+                               "> 12",
+                               "None anticipated"))
+
+#Construct a barplot
+require(calecopal)
+tab_risk_smalls %>% 
+ggplot(aes(x = Risk, y = total, 
+                     ymin = lower, ymax = upper, fill = Risk)) +
+  geom_col() + 
+  geom_errorbar(width = 0.7) +
+  geom_text(aes(label = paste0(paste0(round(total)," \u00B1 "),round(SE))),
+            vjust = -2) +
+  labs(title = "Perceived Financial Health Risk (Statewide Estimate)",
+       subtitle = "(<10,000 Service Connections)",
+       caption = "Strata defined by service connections. Post-stratified by fee code") +
+  xlab("Perceived Months Before Assistance Needed") +
+  ylab("Estimated Number of Systems") +
+  scale_y_continuous(limits = c(0,2000))+
+   scale_fill_manual(values = cal_palette("kelp1"), #reverse color order
+                     name = "Strata") +
+  theme_minimal() +
+  theme(legend.position = "none",
+    legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+    plot.caption = element_text(size = 8))
+```
+Proportions of total systems in these categories are plotted below.
+
+```{r}
+# construct and display a frequency table
+tab_need_cond <- svytable(~months_before_assist.imputed,
+                         design = ps.dsgn) %>%
+  # Add conditional proportions to table
+    as.data.frame() %>%
+    mutate(n = sum(Freq), Prop_Need = Freq/n) %>% 
+  mutate(year = "2020")
+
+# Create a segmented bar graph of the conditional proportions in table
+tab_need_cond %>% 
+  ggplot(aes(x = year, y = Prop_Need, fill = months_before_assist.imputed)) + 
+  geom_col() + 
+  scale_fill_manual(values = cal_palette("kelp1"),
+                    name = "Perceived Months Before Assistance", 
+                    labels = c("0 - 3 months", 
+                               "4 - 6 months",
+                               "7 - 9 months", 
+                               "10 - 12 months",
+                               ">12 months",
+                               "None anticipated")) +
+  ylab("Statewide Proportion of Systems") +
+  labs(title = "Percieved Financial Health Risk (Statewide Estimate)",
+       subtitle = "(<10,000 Service Connections)") +
+  theme_minimal() +
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        legend.box.background = element_rect(color = "black"),
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
+```
 
 ```{r summary statistics}
 # svymean(~cash_reserve_total + tag, dclus1)
+```
+
+#### Correlation: *Percieved* vs. Estimated Risk 
+
+```{r}
+allSmalls.complete %>% 
+  ggplot(aes(x = risk_score_avg, y =months_before_assist_num, weights= final.weight, color = Fee_Code)) +
+  geom_point()
 ```
 
 
@@ -3380,31 +3649,39 @@ confint(dollars_del_acc_TotR)
 dollars_del_acc_TotRs_col <- mutate(dollars_del_acc_TotR,
                                  lower = dollars_del_acc_TotR - 1.96*se,
                                 upper = dollars_del_acc_TotR + 1.96*se)
+#dummy variable for plotting
+dollars_del_acc_TotRs_col %<>% mutate(year = "2020")
+
 #Construct a barplot
 dollars_del_acc_TotRs_col %>% 
-ggplot(aes(x = Fee_Code, y = dollars_del_acc_TotR, 
+  mutate(Fee_Code = fct_reorder(Fee_Code, dollars_del_acc_TotR)) %>%  #reoder so davcl is on bottom
+ggplot(aes(x = year, y = dollars_del_acc_TotR, 
                      ymin = lower, ymax = upper, fill = Fee_Code)) +
   geom_col(position = "identity") +
-  scale_fill_viridis_d() +
-  scale_x_discrete(name = "Fee Code", 
-                    labels = c("Large", 
-                               "Disad. Large")) +
+  scale_fill_manual(values = cal_palette("superbloom1"),
+                      name = "Fee Code",
+                    labels = c("Disad. Large", 
+                               "Large")) +
+ # scale_x_discrete(name = "Fee Code", 
+  #                  labels = c("Large", 
+   #                            "Disad. Large")) +
   scale_y_continuous(labels = scales::dollar_format(),
-                     limits = c(0,1200000000)) +
+                     limits = c(0,1000000000)) +
   labs(y = "Total Estimated Delinquent Amount in Dollars") +
   geom_errorbar(width = 0.7) +
-  labs(title = "Systems >10,000 Service Connections",
+  labs(title = "Statewide Estimated System Debt (>10,000 Service Connections)",
        subtitle = "(95 Confidence Interval)",
        caption = "Post-stratified by service connections and median household income") +
   theme_minimal() +
-  theme(legend.position = "none",
-        legend.box.background = element_rect(color = "black"),
+  theme(legend.box.background = element_rect(color = "black"),
         legend.title = element_text(size = 14),
         legend.text = element_text(size = 12),
         axis.text = element_text(size = 12),
         axis.title = element_text(size = 12),
         plot.title = element_text(hjust = 0.5),
-        plot.subtitle = element_text(hjust = 0.5))
+        plot.subtitle = element_text(hjust = 0.5),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank())
 ```
 
 Below is for larges for total dollars of delinquent accouts (drinking water alone).
@@ -3459,13 +3736,14 @@ dw.debt.total
 Totals are depicted graphically below.
 ```{r}
 #join dataframes
-debt_larges <- rbind(dw.debt.total, debt.total)
+debt_larges <- rbind(dw.debt.total, debt.total) %>% 
+  data.frame()
 
 #add error bars
 debt_larges_comparison <- mutate(debt_larges,
                                  lower = total - 1.96*SE, #95% CI
                                 upper = total + 1.96*SE) %>%  #95% CI
-  mutate(year = "2020")
+  mutate(year = "2020") %>% 
   mutate_if(is.character, as.factor)
 
 
@@ -3494,6 +3772,8 @@ ggplot(aes(x = Debt, y = total,
         plot.subtitle = element_text(hjust = 0.5))
 
 ```
+
+
 
 All of these data can be viewed as a table. 
 ```{r}
