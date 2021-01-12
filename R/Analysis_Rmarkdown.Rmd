@@ -3,12 +3,18 @@ title: "Economic Impacts Assessment"
 author: "Scott Coffin"
 date: "12/23/2020"
 output:
+  word_document:
+    toc: yes
   html_document:
     code_folding: hide
     theme: sandstone
     toc: yes
     toc_float: yes
 ---
+```{r global-options, include=FALSE}
+knitr::opts_chunk$set(fig.width=12, fig.height=8, fig.path='Figs/',
+                      echo=FALSE, warning=FALSE, message=FALSE)
+```
 <!-- # Setup -->
 ```{r setup, include=FALSE, echo = FALSE}
 require("knitr")
@@ -197,65 +203,65 @@ allLarges %<>%
 #   filter(responded == "y")
 ```
 
-# Blending Probability and Non-Probability Samples
+<!-- # Blending Probability and Non-Probability Samples -->
 
-Note that some systems (n = 39 out of 410) that were not requested to participate in the survey did. This is due to some district staff calling systems that were not included in their lists. NOTE: these systems were not 'voluntary' *per se*, but were rather *non-probabilistic*, however in this document, they are referred to as *voluntary* for short-hand.
+<!-- Note that some systems (n = 39 out of 410) that were not requested to participate in the survey did. This is due to some district staff calling systems that were not included in their lists. NOTE: these systems were not 'voluntary' *per se*, but were rather *non-probabilistic*, however in this document, they are referred to as *voluntary* for short-hand. -->
 
-A table displaying the number and proportions of non-probabilistic systems that were included in the survey is below.
-```{r}
-#wide format for table viewing
-allSmalls %>% group_by(tag) %>% filter(voluntary == "n" | voluntary == "y") %>%  summarize(percent.voluntary = sum(volunteered)/n()*100, volunteered.sum = sum(volunteered))
-```
+<!-- A table displaying the number and proportions of non-probabilistic systems that were included in the survey is below. -->
+<!-- ```{r} -->
+<!-- #wide format for table viewing -->
+<!-- allSmalls %>% group_by(tag) %>% filter(voluntary == "n" | voluntary == "y") %>%  summarize(percent.voluntary = sum(volunteered)/n()*100, volunteered.sum = sum(volunteered)) -->
+<!-- ``` -->
 
-These data can also be visualized in a plot. Further annotated with the non-probabilistic responses received.
-```{r}
-#plot
-allSmalls %>% filter(voluntary == "n" | voluntary == "y") %>% 
-  ggplot(aes(x = tag, fill = voluntary)) +
-  geom_bar(position = position_stack(reverse = TRUE))+
-  scale_fill_manual(values = cal_palette("superbloom2"), name = "Sample Type", labels = c("Probabilistic", "Non-probabilistic")) +
-  scale_x_discrete(name = "Sampling Bin") +
-  scale_y_continuous(name = "Responded") +
-  labs(title = "Proportion of Probabilistic and Non-Probabilistic Samples by Sampling Bin")+
-  theme_minimal()
-```
+<!-- These data can also be visualized in a plot. Further annotated with the non-probabilistic responses received. -->
+<!-- ```{r} -->
+<!-- #plot -->
+<!-- allSmalls %>% filter(voluntary == "n" | voluntary == "y") %>%  -->
+<!--   ggplot(aes(x = tag, fill = voluntary)) + -->
+<!--   geom_bar(position = position_stack(reverse = TRUE))+ -->
+<!--   scale_fill_manual(values = cal_palette("superbloom2"), name = "Sample Type", labels = c("Probabilistic", "Non-probabilistic")) + -->
+<!--   scale_x_discrete(name = "Sampling Bin") + -->
+<!--   scale_y_continuous(name = "Responded") + -->
+<!--   labs(title = "Proportion of Probabilistic and Non-Probabilistic Samples by Sampling Bin")+ -->
+<!--   theme_minimal() -->
+<!-- ``` -->
 
-A clear trend of more non-probabilistic responses (referred to as *voluntary*) from the smaller systems (Bins A and B) is visualized in the above figure. To determine if these samples are significantly different from the *probabilistic* samples collected by District staff, a number of tests will be run below. The first of which is a general linear model with a binomial distribution to determine if there are significant relationships between their probabilistic/non-probabilistic status and some auxiliary and response variables, including cash reserves, median 12-month income, number of service connections, and months before assistance.
+<!-- A clear trend of more non-probabilistic responses (referred to as *voluntary*) from the smaller systems (Bins A and B) is visualized in the above figure. To determine if these samples are significantly different from the *probabilistic* samples collected by District staff, a number of tests will be run below. The first of which is a general linear model with a binomial distribution to determine if there are significant relationships between their probabilistic/non-probabilistic status and some auxiliary and response variables, including cash reserves, median 12-month income, number of service connections, and months before assistance. -->
 
-```{r}
-# build model
-volunteerGLM <- glm(volunteered ~ cash_days + cash + Median_12month_HH_income + Service_Connections + months_before_assist, na.action = na.omit,
-            data = allSmalls.responded, family = "binomial")
-#print 
-summary(volunteerGLM)
-```
+<!-- ```{r} -->
+<!-- # build model -->
+<!-- volunteerGLM <- glm(volunteered ~ cash_days + cash + Median_12month_HH_income + Service_Connections + months_before_assist, na.action = na.omit, -->
+<!--             data = allSmalls.responded, family = "binomial") -->
+<!-- #print  -->
+<!-- summary(volunteerGLM) -->
+<!-- ``` -->
 
-There is a nearly significant (*p* = 0.0501) correlation between median 12 month household income and probability to volunteer for the survey, and extremely significant correlation between number of service connections  (*p* = 0.0003) as well as months before assist groups E and F (greater than 12 months and no financial response anticipated, respectively). These trends are likely due to the disproportionate abundance of small systems for which there are *voluntary* samples.
+<!-- There is a nearly significant (*p* = 0.0501) correlation between median 12 month household income and probability to volunteer for the survey, and extremely significant correlation between number of service connections  (*p* = 0.0003) as well as months before assist groups E and F (greater than 12 months and no financial response anticipated, respectively). These trends are likely due to the disproportionate abundance of small systems for which there are *voluntary* samples. -->
 
-```{r}
-p1 <- allSmalls.responded %>% droplevels()
+<!-- ```{r} -->
+<!-- p1 <- allSmalls.responded %>% droplevels() -->
 
-cdplot(voluntary ~ Service_Connections, data =p1,
-       main = "Conditional Density Plot of Volunteer Status for Survey", xlab = "Number of Service Connections", ylab = "Non-probabilistic?")
-```
+<!-- cdplot(voluntary ~ Service_Connections, data =p1, -->
+<!--        main = "Conditional Density Plot of Volunteer Status for Survey", xlab = "Number of Service Connections", ylab = "Non-probabilistic?") -->
+<!-- ``` -->
 
-In the figure above, it is easy to visualize the extremely significant inverse trend between number of service connections and non-probabilistic status in the survey dataset. These proportions may be further visualized by fee code, below.
+<!-- In the figure above, it is easy to visualize the extremely significant inverse trend between number of service connections and non-probabilistic status in the survey dataset. These proportions may be further visualized by fee code, below. -->
 
-```{r}
-#plot
-allSmalls %>% filter(voluntary == "n" | voluntary == "y") %>% 
-  ggplot(aes(x = Fee_Code, fill = voluntary)) +
-  geom_bar(position = "fill")+
-  scale_fill_manual(values = cal_palette("superbloom1"), name = "Sample Type", labels = c("Probabilistic", "Non-probabilistic")) +
-  scale_x_discrete(name = "Fee Code") +
-  scale_y_continuous(name = "Non-probabilistic Proportion", labels = scales::percent) +
-  labs(title = "Proportion of Probabilistic and Non-Probabilistic Samples by Fee Code")+
-  theme_minimal()
-```
+<!-- ```{r} -->
+<!-- #plot -->
+<!-- allSmalls %>% filter(voluntary == "n" | voluntary == "y") %>%  -->
+<!--   ggplot(aes(x = Fee_Code, fill = voluntary)) + -->
+<!--   geom_bar(position = "fill")+ -->
+<!--   scale_fill_manual(values = cal_palette("superbloom1"), name = "Sample Type", labels = c("Probabilistic", "Non-probabilistic")) + -->
+<!--   scale_x_discrete(name = "Fee Code") + -->
+<!--   scale_y_continuous(name = "Non-probabilistic Proportion", labels = scales::percent) + -->
+<!--   labs(title = "Proportion of Probabilistic and Non-Probabilistic Samples by Fee Code")+ -->
+<!--   theme_minimal() -->
+<!-- ``` -->
 
-The figure above shows that the majority of non-probabilistic samples are in the "smalls" fee code categories (DAVCS and CS).
+<!-- The figure above shows that the majority of non-probabilistic samples are in the "smalls" fee code categories (DAVCS and CS). -->
 
-Since the non-probabilistic samples are not equally distributed amongst classes, corrections are necessary to blend them with the probabilistic samples. Since census information is available for the population (i.e. service connections, fee code, districts, etc.), these samples may still be used for further analysis by sub-sampling a representative sample from this list using *sample matching* methods. The theory for matching nonprobability volunteer samples with probability samples is described by [Rubin (1979)](https://www.jstor.org/stable/2286330).
+<!-- Since the non-probabilistic samples are not equally distributed amongst classes, corrections are necessary to blend them with the probabilistic samples. Since census information is available for the population (i.e. service connections, fee code, districts, etc.), these samples may still be used for further analysis by sub-sampling a representative sample from this list using *sample matching* methods. The theory for matching nonprobability volunteer samples with probability samples is described by [Rubin (1979)](https://www.jstor.org/stable/2286330). -->
 
 
 # Survey Completeness
@@ -797,13 +803,23 @@ simpleImputed %>% mutate(Grp = "Imputed") %>%
 We can see that imputation has not noticeably changed the summary statistics of these data. We shall now fill in the dataset with these imputed values. 
 
 ```{r join imputed data,results= 'hide'}
+# Label imputed data
+smalls.imputed.subset <- simpleImputed %>% 
+  rename(cash_reserve_total.imputed = cash_reserve_total,
+         delinquent_num_acc.imputed = delinquent_num_acc,
+         delinquent_amount_dollars.imputed = delinquent_amount_dollars,
+         revenue_2020_Total.imputed = revenue_2020_Total,
+         revenue_2019_Total.imputed = revenue_2019_Total)
+  
 #join data with imputed values to rest of dataset
-imputedSmalls <- right_join(simpleImputed, allSmalls.rest, by = "PWSID")
+allSmalls <- right_join(smalls.imputed.subset, allSmalls, by = "PWSID") 
 #also split the dataset that has requested but no response data, which we will only use to adjust weights in the next section
 allSmalls.requested.voluntary.rest <- allSmalls.requested.voluntary %>% 
   select(-cash_reserve_total, -delinquent_num_acc, -delinquent_amount_dollars, -revenue_2020_Total, -revenue_2019_Total)
 #join
 imputedSmalls.requested.voluntary <- right_join(simpleImputed, allSmalls.requested.voluntary.rest, by = "PWSID")
+
+#remove
 rm(allSmalls.requested.voluntary.rest)
 rm(allSmalls.rest)
 rm(imp)
@@ -1070,7 +1086,7 @@ larges.simple.imputed %>%
 ```
 We can see that imputation has not noticeably changed the summary statistics of these data. We shall now fill in the dataset with these imputed values. 
 
-```{r join imputed data,results= 'hide'}
+```{r join larges imputed data,results= 'hide'}
 #join data with imputed values to rest of dataset, providing imputed tag.
 larges.imputed.subset <- larges.simple.imputed %>% 
   mutate(dollars_del_acc_TotR.imputed = 10 ^ log.dollars_del_acc_TotR,
@@ -1225,7 +1241,7 @@ allSmalls %>% group_by(tag) %>% filter(requested == "y") %>%
 Computing the probability of replying to this survey is challenging because we can not directly observe the probability of replying to the survey, therefore we need to estimate it. This may be done using information which we know for both respondent and non-respondent units. The most reliable (albeit most complicated) of calculating non-response probabilities is through predictive modelling.
 
 [Valliant et al (2013)](https://link.springer.com/book/10.1007%2F978-1-4614-6449-5) recommend estimating the response propensities and then grouping them in classes. The grouping step should avoid extreme weights. One way of estimating the response propensities is using logistic regression. This logistic regression should be unweighted. We will use a general linear model function to predict non-responses with hypothesized response variables for which we have data, including service connections, population, fee code, and regulating agency.
-```{r modeling response propensity}
+```{r modeling response propensity SMALLS}
 #trim data to those in sample list with auxiliary data
 allSmalls.requested.response.model <- allSmalls %>% 
   filter(requested == "y") %>% 
@@ -1623,7 +1639,7 @@ predicted.log %>% head()
 The above output shows the first six estimated response propensities of our dataset. Since we don't have pardata for all samples, we are now computing our predictor estimates from a subset of sampled units.
 
 Let's define our survey structure in the *survey* package.
-```{r survey initiate, results='hide'}
+```{r survey initiate LARGE, results='hide'}
 ##### Specify sampling design ####
 #here we will use our imputed survey dataset
 #(stratified)
@@ -2002,14 +2018,12 @@ Here we can see the strong linear relationship between cash total and service co
 
 #### Small Systems
 The code below uses the *sampling* package to select a sample with probability proportional to the median 12 month household income . The method of selection is to randomize the order of the population and then select a systematic sample (see Hartley and Rao 1962).
-```{r}
-#get population totals for items of interest
-N.PS <- xtabs(~Fee_Code, data = allSmalls)
-```
-
 
 ```{r}
 require(survey)
+#get population totals for items of interest
+N.PS <- xtabs(~Fee_Code, data = allSmalls)
+
 #build survey design with no weights
 srv.dsgn.unweighted <- svydesign(ids = ~0,
                                  strata = ~tag,
@@ -2203,16 +2217,14 @@ p2 <- ggplot(data = tab_fee_need_cond_unwt,
   geom_col() + 
   coord_flip() +
   labs(title = "Months Before Assistance by Fee Code (Pre-Stratification)",
-       xlab = "Proportion") +
-  theme(legend.position = "none")
+       xlab = "Proportion") 
 # Imputed with volunteers
 p3 <- ggplot(data = tab_fee_need_cond_imputed,
        mapping = aes(x = Fee_Code, y = Prop_Need, fill = months_before_assist)) + 
   geom_col() + 
   coord_flip() +
   labs(title = "Months Before Assistance by Fee Code (Imputed, w/Volunteers)",
-       xlab = "Proportion") +
-  theme(legend.position = "none")
+       xlab = "Proportion") 
 
 grid.arrange(p1, p2, p3)
 ```
@@ -2314,7 +2326,7 @@ write.csv(smallsSurveySummaryTotal,
 smallsSurveySummaryTotal
 ```
 Just for debt.
-```{r totals summary for smalls}
+```{r totals summary for larges 0}
 #calcualte unweighted total debt
 srv.total.unweighted.debt <- as.data.frame(svytotal(~delinquent_amount_dollars, 
                          srv.dsgn.unweighted, na.rm = TRUE))
@@ -2361,7 +2373,7 @@ smallsSurveySummaryTotalDebt
 ```
 
 Just for delinquent number of accouunts
-```{r totals summary for smalls}
+```{r totals summary for smalls 2}
 #calcualte unweighted total accounts
 srv.total.unweighted.accounts <- as.data.frame(svytotal(~`Total number of delinquent residential accounts`, 
                          srv.dsgn.unweighted, na.rm = TRUE))
@@ -2400,9 +2412,9 @@ srv.total.imputed.volunteers.accounts <- setNames(cbind(rownames(srv.total.imput
 
 #join tables
 smallsSurveySummaryTotalaccounts <- left_join(left_join(left_join(left_join(srv.total.accounts,post.strat.total.accounts, by = "variable"), srv.total.unadjusted.accounts),srv.total.unweighted.accounts), srv.total.imputed.volunteers.accounts)
-#save
-write.csv(smallsSurveySummaryTotalaccounts,
-          file = "R/output/smallsSurveySummaryTotalaccounts.csv")
+# #save
+# write.csv(smallsSurveySummaryTotalaccounts,
+#           file = "R/output/smallsSurveySummaryTotalaccounts.csv")
 #print
 smallsSurveySummaryTotalaccounts
 ```
@@ -2412,7 +2424,24 @@ Now that we have our adjusted weights, let's extract them and bind to the datafr
 #bind post-stratified weights to all smalls (no volunteers)
 allSmalls.requested.responded <- cbind(allSmalls.requested.responded, weights(ps.dsgn))
 #bind post-stratified weights to imputed survey with volunteers
-imputedSmalls.survey <- cbind(imputedSmalls.survey, weights(ps.dsgn.imputed.volunteers))
+imputedSmalls.survey_final <- cbind(imputedSmalls.survey, weights(ps.dsgn.imputed.volunteers))
+
+allSmalls.imputed <- cbind()
+
+tmp <- imputedSmalls.survey_final %>% 
+  rename(c("final.weight" = 'weights(ps.dsgn.imputed.volunteers)')) %>% 
+  select(-c(unwt.rr, wt.rr.final, unwt.rr.final, final.weight.nonresponse, final.weight.nonresponse.unwt))
+
+tmp2 <- right_join(allSmalls, tmp %>% 
+                     select(final.weight, PWSID))
+tmp3 <- tmp2 %>%   
+  select(-c(wt.rr, unwt.rr, wt.rr.final, unwt.rr.final, sum.base.weight))
+
+####FINAL###
+# write.csv(tmp3,
+#           file = "Datasets/smallSurvey_full_IMPUTED.csv")
+############
+
 
 #Save to csv
 # write.csv(x = allSmalls.requested.responded %>% 
@@ -2425,8 +2454,8 @@ imputedSmalls.survey <- cbind(imputedSmalls.survey, weights(ps.dsgn.imputed.volu
 #              select(PWSID,`weights(ps.dsgn.imputed.volunteers)`),
 #            file = "Datasets/fullSurveyWEIGHTS.csv")
 #Save to csv
-write.csv(x = imputedSmalls.survey,
-           file = "Datasets/fullSurveyIMPUTED.csv")
+# write.csv(x = imputedSmalls.survey,
+#            file = "Datasets/ImputedSmalls_weights.csv")
 
 ```
 
@@ -2457,7 +2486,15 @@ allLarges %>%
   xlab("Median 12-month Houshold Income (log10)") +
   labs(title = "Distribution of Systems by Median Household Income",
        subtitle = "<10,000 Service Connections") +
-  theme_minimal()
+  theme_minimal() +
+  theme(
+        legend.box.background = element_rect(color = "black"),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5))
 ```
 Natural breaks of service connections and median 12-month household income are determined using the Jenk's method.
 ```{r}
@@ -2851,7 +2888,7 @@ write.csv(largeSurveySummaryTotal,
 largeSurveySummaryTotal
 ```
 Just for debt.
-```{r totals summary for larges}
+```{r totals summary for larges 2}
 #calcualte unweighted total debt
 srv.total.unweighted.debt <- as.data.frame(svytotal(~dollars_del_acc_TotR, 
                          srv.dsgn.unweighted.larges, na.rm = TRUE))
@@ -2915,7 +2952,7 @@ largeSurveySummaryDWDebt
 ```
 
 Now for number of delinquent accounts.
-```{r totals summary for larges}
+```{r totals summary for larges 4}
 #calcualte unweighted total accounts
 srv.total.unweighted.accounts <- as.data.frame(svytotal(~`Total number of delinquent residential accounts`, 
                          srv.dsgn.unweighted.larges, na.rm = TRUE))
@@ -2954,10 +2991,11 @@ Now that we have our adjusted weights, let's extract them and bind to the datafr
 #bind post-stratified weights to all smalls (no volunteers)
 #larges <- cbind(larges, weights(ps.dsgn.larges))
 
+tmpL <- larges %>% 
+             select(-c(unwt.rr, unwt.rr.final, final.weight.nonresponse))
 #Save to csv
-write.csv(x = larges %>% 
-             select(PWSID, final.weight, base.weight, fpc,voluntary),
-           file = "Datasets/largeSystemWEIGHTS.csv"
+write.csv(x = tmpL,
+           file = "Datasets/largesSurvey_full_IMPUTED.csv"
            )
 ```
 
@@ -3056,7 +3094,7 @@ write.csv(x = larges %>%
 # Summary Statistics
 Now that we have our adjusted weights and a complete (imputed) dataset, it's time to compute summary statistics (totals, means, variances, ratios, and quantiles).Estimates for statewide number of delinquent accounts for smalls and larges are calcualted below.  
 
-## Smalls
+## Small Systems (>10,000 Service Connections)
 
 ```{r}
 #smalls
@@ -3209,22 +3247,22 @@ tab_debt_lrg_unweighted <- svyby(~dollars_del_dw_TotR,
 ```
 
 ```{r}
-# Create a segmented bar graph of the conditional proportions in table
-p1 <- ggplot(data = tab_debt_cond_lrg,
-       mapping = aes(x = Fee_Code, y = Prop_Need)) + 
-  geom_col() + 
-  coord_flip() +
-  labs(title = "Total Debt (Post-Stratifed)",
-       xlab = "Proportion")
-#before strat
-p2 <- ggplot(data = tab_debt_cond__lrg_unwt,
-       mapping = aes(x = Fee_Code, y = Prop_Need)) + 
-  geom_col() + 
-  coord_flip() +
-  labs(title = "Total Debt (unadjusted weights)",
-       xlab = "Proportion")
-
-grid.arrange(p1, p2)
+# # Create a segmented bar graph of the conditional proportions in table
+# p1 <- ggplot(data = tab_debt_cond_lrg,
+#        mapping = aes(x = Fee_Code, y = Prop_Need)) + 
+#   geom_col() + 
+#   coord_flip() +
+#   labs(title = "Total Debt (Post-Stratifed)",
+#        xlab = "Proportion")
+# #before strat
+# p2 <- ggplot(data = tab_debt_cond__lrg_unwt,
+#        mapping = aes(x = Fee_Code, y = Prop_Need)) + 
+#   geom_col() + 
+#   coord_flip() +
+#   labs(title = "Total Debt (unadjusted weights)",
+#        xlab = "Proportion")
+# 
+# grid.arrange(p1, p2)
 ```
 
 Let's ask what the mean cash reserve total is for each of the strata. The mean for each bin is interpreted as the proportion for each category.
@@ -3234,6 +3272,8 @@ Let's ask what the mean cash reserve total is for each of the strata. The mean f
 # svymean(~cash_reserve_total + tag, dclus1)
 ```
 
+
+## Large Systems (>10,000 Service Connections)
 
 
 
