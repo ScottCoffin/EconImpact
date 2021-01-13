@@ -539,7 +539,7 @@ First let's start my building an Ordinary Least Squares (OLS) linear regression 
 ## Estimate an OLS Regression
 fitols <- lm(cash_reserve_total ~ Service_Connections + Population + Median_12month_HH_income +
                Median_rent_pct_income + CES_3.0_Score + delinquent_num_acc +
-               delinquent_amount_dollars, na.action = na.omit, 
+               delinquent_amount_dollars + cash_reserve_unrestricted  + expense_2019_Apr + expense_2019_May + expense_2019_Jun + expense_2019_Jul + expense_2019_Aug + expense_2019_Sep + expense_2019_Oct + expense_2019_Total + expense_2020_Apr + expense_2020_May + expense_2020_Jun + expense_2020_Jul + expense_2020_Aug + expense_2020_Sep + expense_2020_Oct + expense_2020_Total, na.action = na.omit, 
              data = allSmalls.requested.responded)
 summary(fitols)
 ```
@@ -551,7 +551,7 @@ require(reshape2)
 allSmalls.requested.responded %>% 
   select(PWSID, Service_Connections,  Median_12month_HH_income, CES_3.0_Score,
          months_before_assist_num, cash_reserve_total, delinquent_num_acc, delinquent_amount_dollars,
-         revenue_2020_Total, revenue_2019_Total) %>% 
+         revenue_2020_Total, revenue_2019_Total, cash_reserve_unrestricted  , expense_2019_Apr , expense_2019_May , expense_2019_Jun , expense_2019_Jul , expense_2019_Aug , expense_2019_Sep , expense_2019_Oct , expense_2019_Total , expense_2020_Apr , expense_2020_May , expense_2020_Jun , expense_2020_Jul , expense_2020_Aug , expense_2020_Sep , expense_2020_Oct , expense_2020_Total) %>% 
   melt() %>%  #convert wide to long
   ggplot(aes(x = value)) + 
   stat_density() + 
@@ -564,7 +564,7 @@ require(reshape2)
 allSmalls.requested.responded %>% 
   select(PWSID, Service_Connections,  Median_12month_HH_income, CES_3.0_Score,
          months_before_assist_num, cash_reserve_total, delinquent_num_acc, delinquent_amount_dollars,
-         revenue_2020_Total, revenue_2019_Total) %>% 
+         revenue_2020_Total, revenue_2019_Total, cash_reserve_unrestricted, expense_2019_Total, expense_2020_Total) %>% 
   mutate_if(~is.numeric(.) && (.) > 0, log10) %>% 
   melt() %>%  #convert wide to long
   ggplot(aes(x = value)) + 
@@ -584,7 +584,7 @@ We can see that there is a very wide gap between cash reserves of some systems (
 ```{r}
 allSmalls.requested.responded %>% 
   #filter(cash_reserve_total > 100000) %>% 
-  select(PWSID, cash_reserve_total, Service_Connections, Population, Fee_Code, Regulating_Agency, Water_System_Name, comments_cash_reserves, comments_exp_rev, months_before_assist, delinquent_num_acc) %>% 
+  select(PWSID, cash_reserve_total, Service_Connections, Population, Fee_Code, Regulating_Agency, Water_System_Name, comments_cash_reserves, comments_exp_rev, months_before_assist, delinquent_num_acc, cash_reserve_unrestricted, expense_2019_Total, expense_2020_Total) %>% 
   arrange(desc(cash_reserve_total)) %>% 
   head()
 ```
@@ -599,13 +599,13 @@ Many of these variables are missing at high rates, such as sub-metered status,an
 ```{r}
 #define sub dataset
 allSmalls.simple <- allSmalls.requested.responded %>% 
-  select(PWSID, Service_Connections,  Median_12month_HH_income, CES_3.0_Score, months_before_assist, cash_reserve_total, delinquent_num_acc, delinquent_amount_dollars, revenue_2020_Total, revenue_2019_Total)
+  select(PWSID, Service_Connections,  Median_12month_HH_income, CES_3.0_Score, months_before_assist, cash_reserve_total, delinquent_num_acc, delinquent_amount_dollars, revenue_2020_Total, revenue_2019_Total, cash_reserve_unrestricted  , expense_2019_Apr , expense_2019_May , expense_2019_Jun , expense_2019_Jul , expense_2019_Aug , expense_2019_Sep , expense_2019_Oct , expense_2019_Total , expense_2020_Apr , expense_2020_May , expense_2020_Jun , expense_2020_Jul , expense_2020_Aug , expense_2020_Sep , expense_2020_Oct , expense_2020_Total)
 
 #split the other half of the dataset for easy joining
 allSmalls.rest <- allSmalls %>% 
   filter(requested ==  "y") %>% 
   filter(responded == "y") %>% 
-  select(-Service_Connections, -Median_12month_HH_income, -CES_3.0_Score, -months_before_assist, -cash_reserve_total, -delinquent_num_acc, -delinquent_amount_dollars, -revenue_2020_Total, -revenue_2019_Total)
+  select(-Service_Connections, -Median_12month_HH_income, -CES_3.0_Score, -months_before_assist, -cash_reserve_total, -delinquent_num_acc, -delinquent_amount_dollars, -revenue_2020_Total, -revenue_2019_Total, -cash_reserve_unrestricted, -expense_2019_Apr , -expense_2019_May , -expense_2019_Jun , -expense_2019_Jul , -expense_2019_Aug , -expense_2019_Sep , -expense_2019_Oct , -expense_2019_Total , -expense_2020_Apr , -expense_2020_May , -expense_2020_Jun , -expense_2020_Jul , -expense_2020_Aug , -expense_2020_Sep , -expense_2020_Oct , -expense_2020_Total)
 #see missing values
 md.pattern(allSmalls.simple)
 ```
@@ -652,7 +652,13 @@ ini <- mice(allSmalls.simple, pred=quickpred(allSmalls.simple, mincor=.3), print
             maxit = 20)
 plot(ini)
 ```
-Convergence is quite good for some variables (revenue  2020 and 2019 totals,cash reserves), but poor for others. Let's try another imputation process:
+Convergence is quite good for some variables (revenue  2020 and 2019 totals,cash reserves), but poor for others. CalEnviroScreen 3.0 score imputation looked reasonable. The imputations are annotated below in red, with observed values in blue.
+
+```{r}
+# inspect quality of imputations
+stripplot(ini, CES_3.0_Score~.imp, pch = 19, xlab = "Imputation number")
+```
+Let's try another imputation process:
 ```{r}
 # With this command, we tell mice to impute the subset data, create 5 datasets, use predM as the predictor matrix and don't print the imputation process. If you would like to see the process, set print as TRUE
 imp2 <- mice(allSmalls.simple, 
@@ -707,7 +713,7 @@ pool(fitimp)
 We can see that these values are very low. Let's compare to the default model.
 ```{r}
 #First, turn the datasets into long format
-allSmalls.simple_long_1 <- mice::complete(imp, action="long", include = TRUE)
+allSmalls.simple_long_1 <- mice::complete(ini, action="long", include = TRUE)
 
 # #provide integer tag for voluntary status
 # allSmalls.simple_long %<>% 
@@ -730,44 +736,79 @@ These two models are virtually the same.
 
 Let's further inspect the imputed values by plotting the histograms (using density plots) for the real (blue) and imputed (red) values. 
 ```{r}
-densityplot(imp)
+densityplot(ini)
 ```
-Many of these variables seem to be well-predicted by the mode. The worst seems to be CES 3.0 score and 12 month household income. Looking closer.
+Many of these variables seem to be well-predicted by the mode. The worst seems to be CES 3.0 score and 12 month household income. Looking closer at these distributions.
 ```{r}
-densityplot(imp, ~CES_3.0_Score)
+densityplot(ini, ~CES_3.0_Score)
 ```
-We can see here that the model biases towards lower CalEnviroScreen 3.0 scores. 
+We can see here that the quick prediction model biases towards lower CalEnviroScreen 3.0 scores. Let's see if the classification and regression tree (CART) model worked any better.
+```{r}
+densityplot(imp2, ~CES_3.0_Score)
+```
+
+The CART method seems to have learned the distribution slightly more accurately for this variable. The most complex distribution is months before assistance needed. Let's see how well the passive method learned this.
 ```{r}
 densityplot(imp, ~months_before_assist)
 ```
-This model seems to overestimate the number of systems that will need immediate assistance. 
+This model seems to overestimate the number of systems that will need immediate assistance. How does CART compare?
+```{r}
+densityplot(imp2, ~months_before_assist)
+```
+Not much difference.
+
+Let's look median 12 month household income for the passive method.
 ```{r}
 densityplot(imp, ~Median_12month_HH_income)
 ```
-This model has not adequately learned income status.
+The passive model has not adequately learned income status. Let's see how the quickprediction model performed,
+
+```{r}
+densityplot(ini, ~Median_12month_HH_income)
+```
+
+These two models performed quite similiarly. Let's see about the CART model.
+
+```{r}
+densityplot(imp2, ~Median_12month_HH_income)
+```
+
+The CART model seems to be preferable. Let's look at one more variable. Here's the passive method for delinquent number of accounts.
 
 ```{r}
 densityplot(imp, ~delinquent_num_acc)
 ```
-Also not great.
+
+Not terrific. How about the quickprediction?
 ```{r}
-densityplot(imp, ~revenue_2019_Total)
+densityplot(ini, ~delinquent_num_acc)
 ```
-Seems ok.
+Much better. CART?
+
 ```{r}
-densityplot(imp, ~revenue_2020_Total)
+densityplot(imp2, ~delinquent_num_acc)
+```
+
+Here the quickprediction performed better, although the CART model was not much different. Here's the 2019 total revenue for the quickprediction model.
+
+```{r}
+densityplot(ini, ~revenue_2019_Total)
+```
+Seems ok. 2020 revenue total for the quick prediction model.
+```{r}
+densityplot(ini, ~revenue_2020_Total)
 ```
 Great!
 
-Let's further compare the default imputation method (passive multiple imputation) with the other method employed (Classification and regression trees method) for CES 3.0 score. 
+Let's further compare the default imputation method (passive multiple imputation) with the quick prediction method and the Classification and regression trees method for CES 3.0 score. 
 ```{r}
-CES_3.0_Score <- c(complete(imp)$CES_3.0_Score, complete(imp)$CES_3.0_Score)
-method <- rep(c("pmm", "cart"), each = nrow(allSmalls.simple))
+CES_3.0_Score <- c(complete(imp)$CES_3.0_Score, complete(ini)$CES_3.0_Score, complete(imp2)$CES_3.0_Score)
+method <- rep(c("pmm", "quick prediction", "cart"), each = nrow(allSmalls.simple))
 CES_3.0_Score_m <- data.frame(CES_3.0_Score = CES_3.0_Score, method = method)
 #plot histogram
 histogram( ~CES_3.0_Score | method, data = CES_3.0_Score_m, nint = 25)
 ```
-Here we see that passive multiple imputation and the Classification and regression trees method do not seemingly differ in prediction. However, these values were still poorly predicted, so we will not use them further.
+Here we see that these three methods do not seemingly differ in prediction. Any model would be acceptable for imputation.
 
 Now that we are satisfied with the selected imputed variables for dataset, let's extract the completed data and confirm that there are no additional missing values. 
 ```{r}
@@ -812,7 +853,24 @@ smalls.imputed.subset <- simpleImputed %>%
          revenue_2019_Total.imputed = revenue_2019_Total,
          Median_12month_HH_income.imputed = Median_12month_HH_income,
          CES_3.0_Score.imputed = CES_3.0_Score,
-         months_before_assist.imputed = months_before_assist)
+         months_before_assist.imputed = months_before_assist,
+         cash_reserve_unrestricted.imputed = cash_reserve_unrestricted, 
+         expense_2019_Apr.imputed = expense_2019_Apr,
+         expense_2019_May.imputed = expense_2019_May,
+         expense_2019_Jun.imputed = expense_2019_Jun,
+         expense_2019_Jul.imputed = expense_2019_Jul,
+         expense_2019_Aug.imputed = expense_2019_Aug,
+         expense_2019_Sep.imputed = expense_2019_Sep,
+         expense_2019_Oct.imputed = expense_2019_Oct,
+         expense_2019_Total.imputed = expense_2019_Total,
+         expense_2020_Apr.imputed = expense_2020_Apr,
+         expense_2020_May.imputed = expense_2020_May,
+         expense_2020_Jun.imputed = expense_2020_Jun,
+         expense_2020_Jul.imputed = expense_2020_Jul,
+         expense_2020_Aug.imputed = expense_2020_Aug,
+         expense_2020_Sep.imputed = expense_2020_Sep,
+         expense_2020_Oct.imputed = expense_2020_Oct,
+         expense_2020_Total.imputed = expense_2020_Total)
   
 #join data with imputed values to rest of dataset
 allSmalls <- right_join(smalls.imputed.subset %>% select(-c(Service_Connections)), allSmalls, by = "PWSID") 
@@ -823,7 +881,7 @@ allSmalls.requested.responded <- allSmalls %>%
 
 #also split the dataset that has requested but no response data, which we will only use to adjust weights in the next section
 allSmalls.requested.voluntary.rest <- allSmalls.requested.voluntary %>% 
-  select(-cash_reserve_total, -delinquent_num_acc, -delinquent_amount_dollars, -revenue_2020_Total, -revenue_2019_Total, -CES_3.0_Score, -Median_12month_HH_income, -months_before_assist )
+  select(-cash_reserve_total, -delinquent_num_acc, -delinquent_amount_dollars, -revenue_2020_Total, -revenue_2019_Total, -CES_3.0_Score, -Median_12month_HH_income, -months_before_assist, -cash_reserve_unrestricted  , -expense_2019_Apr , -expense_2019_May , -expense_2019_Jun , -expense_2019_Jul , -expense_2019_Aug , -expense_2019_Sep , -expense_2019_Oct , -expense_2019_Total , -expense_2020_Apr , -expense_2020_May , -expense_2020_Jun , -expense_2020_Jul , -expense_2020_Aug , -expense_2020_Sep , -expense_2020_Oct , -expense_2020_Total )
 #join
 imputedSmalls.requested.voluntary <- right_join(simpleImputed %>%  select(-c(Service_Connections)), allSmalls.requested.voluntary.rest, by = "PWSID")
 
@@ -2238,8 +2296,8 @@ srv.mean.imputed.volunteers <- setNames(cbind(rownames(srv.mean.imputed.voluntee
 #join tables
 smallsSurveySummary <- left_join(left_join(left_join(left_join(srv.mean,post.strat.mean, by = "variable"), srv.mean.unadjusted),srv.mean.unweighted), srv.mean.imputed.volunteers)
 #save
-write.csv(smallsSurveySummary,
-          file = "R/output/smallsSurveySummary.csv")
+# write.csv(smallsSurveySummary,
+#           file = "R/output/smallsSurveySummary.csv")
 #print
 smallsSurveySummary
 ```
@@ -2389,8 +2447,8 @@ srv.total.imputed.volunteers <- setNames(cbind(rownames(srv.total.imputed.volunt
 #join tables
 smallsSurveySummaryTotal <- left_join(left_join(left_join(left_join(srv.total,post.strat.total, by = "variable"), srv.total.unadjusted),srv.total.unweighted), srv.total.imputed.volunteers)
 #save
-write.csv(smallsSurveySummaryTotal,
-          file = "R/output/smallsSurveySummaryTotal.csv")
+# write.csv(smallsSurveySummaryTotal,
+#           file = "R/output/smallsSurveySummaryTotal.csv")
 #print
 smallsSurveySummaryTotal
 ```
@@ -2435,8 +2493,8 @@ srv.total.imputed.volunteers.debt <- setNames(cbind(rownames(srv.total.imputed.v
 #join tables
 smallsSurveySummaryTotalDebt <- left_join(left_join(left_join(left_join(srv.total.debt,post.strat.total.debt, by = "variable"), srv.total.unadjusted.debt),srv.total.unweighted.debt), srv.total.imputed.volunteers.debt)
 #save
-write.csv(smallsSurveySummaryTotalDebt,
-          file = "R/output/smallsSurveySummaryTotalDebt.csv")
+# write.csv(smallsSurveySummaryTotalDebt,
+#           file = "R/output/smallsSurveySummaryTotalDebt.csv")
 #print
 smallsSurveySummaryTotalDebt
 ```
@@ -2505,13 +2563,13 @@ tmp3 <- tmp2 %>%
   select(-c(wt.rr, unwt.rr, wt.rr.final, unwt.rr.final, sum.base.weight))
 
 ####FINAL###
-write.csv(tmp3,
-           file = "Datasets/smallSurvey_full_IMPUTED.csv")
+# write.csv(tmp3,
+#            file = "Datasets/smallSurvey_full_IMPUTED.csv")
 ############
 
-#full dataset with imputed values (labeled) and final weights
-write.csv(allSmalls,
-          file = "Datasets/smallSurvey_population_IMPUTED.csv")
+# #full dataset with imputed values (labeled) and final weights
+# write.csv(allSmalls,
+#           file = "Datasets/smallSurvey_population_IMPUTED.csv")
 
 #Save to csv
 # write.csv(x = allSmalls.requested.responded %>% 
@@ -3016,8 +3074,8 @@ post.strat.total <- setNames(cbind(rownames(post.strat.total), post.strat.total,
 largeSurveySummaryTotal <- left_join(left_join(srv.total.unweighted,srv.total.unadjusted,
                                             by ="variable"),post.strat.total)
 #save
-write.csv(largeSurveySummaryTotal,
-          file = "R/output/largeSurveySummaryTotal.csv")
+# write.csv(largeSurveySummaryTotal,
+#           file = "R/output/largeSurveySummaryTotal.csv")
 #print
 largeSurveySummaryTotal
 ```
@@ -3047,8 +3105,8 @@ post.strat.total.debt <- setNames(cbind(rownames(post.strat.total.debt), post.st
 #join tables
 largeSurveySummaryTotalDebt <- left_join(left_join(srv.total.unadjusted.debt, post.strat.total.debt, by = "variable"),srv.total.unweighted.debt)
 #save
-write.csv(largeSurveySummaryTotalDebt,
-          file = "R/output/largeSurveySummaryTotalDebt.csv")
+# write.csv(largeSurveySummaryTotalDebt,
+#           file = "R/output/largeSurveySummaryTotalDebt.csv")
 #print
 largeSurveySummaryTotalDebt
 ```
@@ -3079,8 +3137,8 @@ post.strat.total.debt <- setNames(cbind(rownames(post.strat.total.debt), post.st
 #join tables
 largeSurveySummaryDWDebt <- left_join(left_join(srv.total.unadjusted.debt, post.strat.total.debt, by = "variable"),srv.total.unweighted.debt)
 #save
-write.csv(largeSurveySummaryDWDebt,
-          file = "R/output/largeSurveySummaryDWDebt.csv")
+# write.csv(largeSurveySummaryDWDebt,
+#           file = "R/output/largeSurveySummaryDWDebt.csv")
 #print
 largeSurveySummaryDWDebt
 ```
@@ -3111,8 +3169,8 @@ post.strat.total.accounts <- setNames(cbind(rownames(post.strat.total.accounts),
 #join tables
 largeSurveySummaryTotalaccounts <- left_join(left_join(srv.total.unadjusted.accounts, post.strat.total.accounts, by = "variable"),srv.total.unweighted.accounts)
 #save
-write.csv(largeSurveySummaryTotalaccounts,
-          file = "R/output/largeSurveySummaryTotalaccounts.csv")
+# write.csv(largeSurveySummaryTotalaccounts,
+#           file = "R/output/largeSurveySummaryTotalaccounts.csv")
 #print
 largeSurveySummaryTotalaccounts
 ```
@@ -3128,9 +3186,9 @@ Now that we have our adjusted weights, let's extract them and bind to the datafr
 tmpL <- larges %>% 
              select(-c(unwt.rr, unwt.rr.final, final.weight.nonresponse))
 #Save to csv
-write.csv(x = tmpL,
-           file = "Datasets/largesSurvey_full_IMPUTED.csv"
-           )
+# write.csv(x = tmpL,
+#            file = "Datasets/largesSurvey_full_IMPUTED.csv"
+#            )
 ```
 
 
