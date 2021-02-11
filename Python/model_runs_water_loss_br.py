@@ -19,8 +19,7 @@ def input_and_refresh(model_work,mod_refresh,test_inputs):
     wbk_mod['Inputs']['B12'].value = test_inputs['Variable production cost (AF)']
     wbk_mod['Inputs']['B13'].value = test_inputs['Avg operating pressure']
     #Save the model file
-    model_mod=model_work
-    wbk_mod.save(model_mod)
+    wbk_mod.save(model_work)
     del wbk_mod
     #Use win32com to open and refresh the model
     #If you don't do this, the values won't update!
